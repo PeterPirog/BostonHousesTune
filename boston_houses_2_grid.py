@@ -11,9 +11,10 @@ from sklearn.metrics import mean_absolute_percentage_error,make_scorer,r2_score,
 
 
 if __name__ == '__main__':
-    pd.set_option('display.max_columns', None)
+    verbose=True
 
-    df_train=pd.read_csv('train.csv')
+    pd.set_option('display.max_columns', None)
+    df_train=pd.read_csv('data/train.csv')
 
     #csv preporcessing
     #del df_train['Id']
@@ -26,7 +27,7 @@ if __name__ == '__main__':
     #print(X_train.head())
     #print(X_train.info())
 
-    X_test=pd.read_csv('test.csv')
+    X_test=pd.read_csv('data/test.csv')
 
     #csv preporcessing
     #del df_train['Id']
@@ -55,8 +56,8 @@ if __name__ == '__main__':
     clf=GridSearchCV(estimator=tree_reg,
                      param_grid=rf_param_grid,
                      scoring=scorer,
-                     cv=4,
-                     n_jobs=8)
+                     cv=5,
+                     n_jobs=-1)
     search=clf.fit(X=X_train,y=Y_train)
 
     print(f'search.best_params_: {search.best_params_}')

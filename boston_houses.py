@@ -13,7 +13,7 @@ from category_encoders import OneHotEncoder
 if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
 
-    df_train=pd.read_csv('train.csv')
+    df_train=pd.read_csv('data/train.csv')
 
     #csv preporcessing
     #del df_train['Id']
@@ -45,8 +45,8 @@ if __name__ == '__main__':
     imp = IterativeImputerDf(min_value=0,  # values from 0 to 1 for categorical for numeric
                              max_value=1,
                              random_state=42,
-                             max_iter=100,
-                             tol=1e-4,
+                             max_iter=40,
+                             tol=1e-3,
                              verbose=2, dataframe_as_output=True)
 
     pipe = Pipeline([
