@@ -10,8 +10,20 @@ from sklearn.pipeline import Pipeline
 from Transformers import QuantileTransformerDf, IterativeImputerDf, RareLabelNanEncoder
 from category_encoders import OneHotEncoder
 
+#DESCRIPTION
+#UPGRADEED BY DIFFERENT PREPROCESSING PIPELINES
+
 if __name__ == '__main__':
     verbose=False
+
+    #Rare encoder options
+    n_categories=6
+    tol=0.05
+    x_train_filename='data/X_train_enc_'+str(n_categories)+'_'+str(tol)
+    xy_train_filename='data/XY_train_enc_'+str(n_categories)+'_'+str(tol)
+    print(f"preprocessing rare values with n_categories={n_categories}, tol={tol}")
+
+
     # make all dataframe columns visible
     pd.set_option('display.max_columns', None)
 
@@ -26,7 +38,7 @@ if __name__ == '__main__':
         print(X_train.head())
         print(X_train.info())
     # STEP 1 -  categorical features rare labels encoding
-    rle = RareLabelNanEncoder(categories=None, tol=0.05, minimum_occurrences=None, n_categories=10,
+    rle = RareLabelNanEncoder(categories=None, tol=tol, minimum_occurrences=None, n_categories=n_categories,
                               max_n_categories=None,
                               replace_with='Rare', impute_missing_label=False, additional_categories_list=None)
 
@@ -46,8 +58,8 @@ if __name__ == '__main__':
     imp = IterativeImputerDf(min_value=0,  # values from 0 to 1 for categorical for numeric
                              max_value=1,
                              random_state=42,
-                             max_iter=40,
-                             tol=1e-3,
+                             max_iter=25,
+                             tol=1e-5,
                              verbose=2, dataframe_as_output=True)
 
     pipe = Pipeline([
@@ -66,16 +78,16 @@ if __name__ == '__main__':
         print(f'\ndf_original=\n{X_train}')
         print(f'df_imputed=\n{X_train_encoded.head()}')
     # save encoded data to csv and xls files
-    X_train_encoded.to_csv('data/X_train_enc.csv', index=False)
-    X_train_encoded.to_excel('data/X_train_enc.xlsx',sheet_name='X_encoded',index=False)
+    X_train_encoded.to_csv(x_train_filename+'.csv', index=False)
+    X_train_encoded.to_excel(x_train_filename+'.xlsx',sheet_name='X_encoded',index=False)
 
     #concatenate columns of encoded X_train with Y_train
     XY_encoded=pd.concat([X_train_encoded,Y_train],axis=1).astype('float32')
-    XY_encoded.to_csv('data/XY_train_enc.csv', index=False)
-    XY_encoded.to_excel('data/XY_train_enc.xlsx',sheet_name='XY_encoded',index=False)
+    XY_encoded.to_csv(xy_train_filename+'.csv', index=False)
+    XY_encoded.to_excel(xy_train_filename+'.xlsx',sheet_name='XY_encoded',index=False)
 
     # SAVE PIPELINE
-    joblib.dump(pipe, 'preprocessing_pipe.pkl')
+    joblib.dump(pipe, 'preprocessing_pipe_'+str(n_categories)+'_'+str(tol)+'.pkl')
 
     # LOAD PIPELINE
     #loaded_pipe = joblib.load('preprocessing_pipe.pkl', mmap_mode=None)

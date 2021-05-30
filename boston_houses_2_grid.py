@@ -7,6 +7,7 @@ from sklearn.experimental import enable_iterative_imputer  # noqa
 from sklearn.tree import DecisionTreeRegressor,export_graphviz
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_absolute_percentage_error,make_scorer,r2_score,mean_squared_error,mean_absolute_error
+from sklearn import ensemble
 
 
 

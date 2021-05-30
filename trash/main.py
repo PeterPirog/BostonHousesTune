@@ -1,4 +1,4 @@
-import modin.pandas as pd
+import pandas as pd
 from collections import OrderedDict
 
 
@@ -155,7 +155,7 @@ class DatasetKnowledge():
 
 
 if __name__ == '__main__':
-    dataset = DatasetKnowledge(csv_file_path='../data/train.csv')
+    dataset = DatasetKnowledge(csv_file_path='data/train.csv')
 
     print('\n dataset.features=',dataset.features)
     dataset.define_targets(['SalePrice'])
