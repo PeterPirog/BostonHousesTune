@@ -57,7 +57,8 @@ if __name__ == "__main__":
              include_dashboard=True,  # if you use docker use docker run -p 8265:8265 -p 6379:6379
              dashboard_host='0.0.0.0')
     """
-    ray.init(address='auto', _redis_password='5241590000000000')
+    #ray.init(address='auto', _redis_password='5241590000000000')
+    ray.init()
 
     sched_asha = ASHAScheduler(time_attr="training_iteration",
                           max_t=100,

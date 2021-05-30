@@ -1,4 +1,5 @@
 from sklearn.metrics import make_scorer
+import tensorflow as tf
 import numpy as np
 import scipy.stats as st
 import math
@@ -20,9 +21,11 @@ def mre_bound(y_true, y_pred):
 
 
 # A function to calculate Root Mean Squared Logarithmic Error (RMSLE)
-def rmsle(y_pred, y_test) :
+def rmsle(y_pred, y_test):
     assert len(y_test) == len(y_pred)
-    return np.sqrt(np.mean((np.log1p(y_pred) - np.log1p(y_test))**2))
+    return np.sqrt(np.mean((np.log1p(y_pred) - np.log1p(y_test)) ** 2))
+
+
 
 
 if __name__ == '__main__':

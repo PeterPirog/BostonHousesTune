@@ -3,6 +3,7 @@ import numpy as np
 import joblib
 
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
 
 
 def make_submission(trained_regressor,
@@ -19,7 +20,7 @@ def make_submission(trained_regressor,
 
     # input data preprocessing
     X_test_encoded = preprocessing_pipe.transform(X_test)
-    #predict y values
+    # predict y values
     y_predict = trained_regressor.predict(X_test_encoded)
 
     y_predict = pd.DataFrame(y_predict, columns=['SalePrice'])
@@ -28,20 +29,32 @@ def make_submission(trained_regressor,
     Y_predict.to_csv(submission_file_name, index=False)
 
 
+def get_Xy(XY_train_enc_file, test_size=0.1):
+    #XY_train_enc_file = 'data/XY_train_enc_' + str(n_categories) + '_' + str(tol) + '.csv'
+
+    df = pd.read_csv(XY_train_enc_file)
+    X = df.drop(['SalePrice'], axis=1).to_numpy()
+    y = df['SalePrice'].copy().to_numpy()
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
+                                                        shuffle=True,
+                                                        random_state=42)
+
+    return X_train, X_test, y_train, y_test
+
 if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
-    #Rare encoder options
-    n_categories=2
-    tol=0.05
-    xy_train_filename='data/XY_train_enc_'+str(n_categories)+'_'+str(tol)+'.csv'
+    get_Xy(n_categories=2)
+    # Rare encoder options
+    n_categories = 2
+    tol = 0.05
+    xy_train_filename = 'data/XY_train_enc_' + str(n_categories) + '_' + str(tol) + '.csv'
 
     # load X_train, y_train data
     X_train = pd.read_csv('data/X_train_enc.csv')
 
-
     df_train = pd.read_csv(xy_train_filename)
     y_train = df_train['SalePrice'].copy().to_numpy()
-
 
     regressor = RandomForestRegressor(n_estimators=200, max_depth=25, n_jobs=-1)
 
