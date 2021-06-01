@@ -4,6 +4,7 @@ import joblib
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
+import tensorflow as tf
 
 
 def make_submission(trained_regressor,
@@ -59,6 +60,9 @@ if __name__ == '__main__':
     regressor = RandomForestRegressor(n_estimators=200, max_depth=25, n_jobs=-1)
 
     regressor.fit(X=X_train, y=y_train)
+
+    #keras regressor
+    model=tf.keras.models.load_model(filepath='my_model.h5')
 
     make_submission(trained_regressor=regressor,
                     test_csv_file='data/test.csv',

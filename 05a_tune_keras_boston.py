@@ -3,6 +3,8 @@ from tensorflow.keras.datasets import mnist
 from ray.tune.integration.keras import TuneReportCallback
 import numpy as np
 import tensorflow as tf  # tensorflow >= 2.5
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 from boston_tools import get_Xy
 
 
@@ -68,10 +70,7 @@ def train_boston(config):
         epochs=epochs,
         verbose=0,
         validation_data=(X_test, y_test),  # tf reduce mean ignore tabnanny
-        callbacks=[TuneReportCallback({'val_rmsle':'val_rmsle'
-            #"mean_absolute_percentage_error": "val_mean_absolute_percentage_error"
-            ##optional values ['loss', 'accuracy', 'val_loss', 'val_accuracy']
-        })])  # "mean_accuracy": "val_accuracy"
+        callbacks=callbacks_list)
 
 
 
@@ -102,7 +101,7 @@ if __name__ == "__main__":
 
     sched_asha = ASHAScheduler(time_attr="training_iteration",
                                max_t=500,
-                               grace_period=10,
+                               grace_period=16,
                                # mode='max', #find maximum, do not define here if you define in tune.run
                                reduction_factor=3,
                                # brackets=1
@@ -137,16 +136,16 @@ if __name__ == "__main__":
             "n_categories": tune.choice([1, 2, 3, 6]),
             # training parameters
             "batch": tune.choice([4, 8]),
-            "lr": tune.loguniform(1e-5, 1e-2),
+            "lr":tune.choice([1e-2]) ,#tune.loguniform(1e-5, 1e-2)
             # Layer 1 params
             "hidden1": tune.randint(16, 129),
             "activation1": tune.choice(["elu"]),
             "dropout1": tune.uniform(0.01, 0.15),
             # Layer 2 params
             "hidden2": tune.randint(16, 129),
-            "dropout2": tune.uniform(0.01, 0.15),  # tune.choice([0.01, 0.02, 0.05, 0.1, 0.2])
+            "dropout2": tune.uniform(0.05, 0.2),  # tune.choice([0.01, 0.02, 0.05, 0.1, 0.2])
             "activation2": tune.choice(["elu"]),
-            "activation_output": tune.choice(["elu"])  # ,tf.keras.activations.exponential
+            "activation_output": tune.choice(["elu",tf.keras.activations.exponential])  # ,tf.keras.activations.exponential
             # "layers": tune.choice([2]),tf.keras.activations.exponential
 
         }

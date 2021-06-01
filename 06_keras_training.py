@@ -10,25 +10,6 @@ from boston_tools import get_Xy
 def rmsle(y_pred, y_test):
     return tf.math.sqrt(tf.reduce_mean((tf.math.log1p(y_pred) - tf.math.log1p(y_test)) ** 2))
 
-class Rmsle(tf.keras.callbacks.Callback):
-        def on_train_begin(self, logs={}):
-            self._data = []
-
-        def on_epoch_end(self, batch, logs={}):
-            X_val, y_val = self.validation_data[0], self.validation_data[1]
-            y_predict = np.asarray(model.predict(X_val))
-
-            y_val = np.argmax(y_val, axis=1)
-            y_predict = np.argmax(y_predict, axis=1)
-
-            self._data.append({
-                'rmsle': rmsle(y_val, y_predict),
-            })
-            return
-
-        def get_data(self):
-            return self._data
-
 if __name__ == "__main__":
 
     # https://github.com/tensorflow/tensorflow/issues/32159
@@ -42,14 +23,14 @@ if __name__ == "__main__":
         "batch": 4,
         "lr": 0.01,
         # Layer 1 params
-        "hidden1": 65,
+        "hidden1": 60,
         "activation1": "elu",
         "dropout1": 0.1,
         # Layer 2 params
-        "hidden2": 30,
-        "dropout2": 0.04,  # tune.choice([0.01, 0.02, 0.05, 0.1, 0.2])
+        "hidden2": 22,
+        "dropout2": 0.1,
         "activation2": "elu",
-        "activation_output": "elu"}
+        "activation_output":  'selu'}
 
     num_classes = 1
     epochs = 1000
@@ -82,16 +63,16 @@ if __name__ == "__main__":
 
     model.compile(
         loss=rmsle,  # mean_squared_logarithmic_error "mse"
-        optimizer=tf.keras.optimizers.Adam(lr=config["lr"]),
-        metrics=[tf.keras.metrics.MeanSquaredLogarithmicError()])  # accuracy mean_squared_logarithmic_error
+        optimizer=tf.keras.optimizers.Adam(learning_rate=config["lr"]),
+        metrics=[rmsle])  # accuracy mean_squared_logarithmic_error tf.keras.metrics.MeanSquaredLogarithmicError()
 
-    callbacks_list=[tf.keras.callbacks.EarlyStopping(monitor='val_mean_squared_logarithmic_error',
+    callbacks_list=[tf.keras.callbacks.EarlyStopping(monitor='val_rmsle',
                                                      patience=15),
-                    tf.keras.callbacks.ReduceLROnPlateau(monitor='val_mean_squared_logarithmic_error',
+                    tf.keras.callbacks.ReduceLROnPlateau(monitor='val_rmsle',
                                                          factor=0.1,
                                                          patience=10),
                     tf.keras.callbacks.ModelCheckpoint(filepath='my_model.h5',
-                                                       monitor='val_mean_squared_logarithmic_error',
+                                                       monitor='val_rmsle',
                                                        save_best_only=True)]
     model.fit(
         X_train,
