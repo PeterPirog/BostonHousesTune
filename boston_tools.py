@@ -34,8 +34,8 @@ def get_Xy(XY_train_enc_file, test_size=0.1):
     #XY_train_enc_file = 'data/XY_train_enc_' + str(n_categories) + '_' + str(tol) + '.csv'
 
     df = pd.read_csv(XY_train_enc_file)
-    X = df.drop(['SalePrice'], axis=1).to_numpy()
-    y = df['SalePrice'].copy().to_numpy()
+    X = df.drop(['SalePrice'], axis=1).to_numpy().astype(np.float64)
+    y = df['SalePrice'].copy().to_numpy().astype(np.float64)
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                         shuffle=True,

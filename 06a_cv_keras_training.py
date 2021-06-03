@@ -28,17 +28,17 @@ if __name__ == "__main__":
 
     config = {
         # preprocessing parameters
-        "n_categories": 3,
+        "n_categories": 6,
         # training parameters
         "batch": 4,
         "lr": 0.01,
         # Layer 1 params
-        "hidden1": 60,
+        "hidden1": 150,
         "activation1": "elu",
-        "dropout1": 0.2,
+        "dropout1": 0.08,
         # Layer 2 params
-        "hidden2": 22,
-        "dropout2": 0.2,
+        "hidden2": 121,
+        "dropout2": 0.075,
         "activation2": "elu",
         "activation_output": "elu"}
 

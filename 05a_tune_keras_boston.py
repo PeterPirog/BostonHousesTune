@@ -1,11 +1,12 @@
-#UBUNTU
+# UBUNTU
 from tensorflow.keras.datasets import mnist
 from ray.tune.integration.keras import TuneReportCallback
 import numpy as np
 import tensorflow as tf  # tensorflow >= 2.5
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 from boston_tools import get_Xy
+from sklearn.decomposition import PCA
 
 
 # https://stackoverflow.com/questions/37657260/how-to-implement-custom-metric-in-keras
@@ -19,15 +20,20 @@ def train_boston(config):
     # https://github.com/tensorflow/tensorflow/issues/32159
     import tensorflow as tf
     # print('Is cuda available for trainer:', tf.config.list_physical_devices('GPU'))
-    num_classes = 1
     epochs = 1000
 
     # choose preprocessed features file
     XY_train_enc_file = f'/home/peterpirog/PycharmProjects/BostonHousesTune/data/XY_train_enc_' \
                         f'{str(config["n_categories"])}_0.05.csv'
-    #XY_train_enc_file = f'data/X_train_enc_{str(config["n_categories"])}_0.05.csv'
+    # XY_train_enc_file = f'data/X_train_enc_{str(config["n_categories"])}_0.05.csv'
 
     X_train, X_test, y_train, y_test = get_Xy(XY_train_enc_file=XY_train_enc_file)
+    if config['pca']:
+        # PCA decomposition
+        pca = PCA(n_components='mle', svd_solver='full')
+        pca.fit_transform(X_train)
+        X_train = pca.transform(X_train)
+        X_test = pca.transform(X_test)
 
     # define model
     inputs = tf.keras.layers.Input(shape=(X_train.shape[1]))
@@ -44,7 +50,7 @@ def train_boston(config):
     x = tf.keras.layers.LayerNormalization()(x)
     x = tf.keras.layers.Dropout(config["dropout2"])(x)
 
-    outputs = tf.keras.layers.Dense(units=num_classes, activation="elu")(x)
+    outputs = tf.keras.layers.Dense(units=1, activation="elu")(x)
 
     model = tf.keras.Model(inputs=inputs, outputs=outputs, name="boston_model")
 
@@ -54,14 +60,14 @@ def train_boston(config):
         metrics=[rmsle])  # accuracy mean_squared_logarithmic_error
 
     callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='val_rmsle',
-                                                       patience=15),
+                                                       patience=10),
                       tf.keras.callbacks.ReduceLROnPlateau(monitor='val_rmsle',
-                                                           factor=0.1,
-                                                           patience=10),
+                                                           factor=0.5,
+                                                           patience=5),
                       tf.keras.callbacks.ModelCheckpoint(filepath='my_model.h5',
                                                          monitor='val_rmsle',
                                                          save_best_only=True),
-                      TuneReportCallback({'val_rmsle':'val_rmsle'})]
+                      TuneReportCallback({'val_rmsle': 'val_rmsle'})]
 
     model.fit(
         X_train,
@@ -71,10 +77,6 @@ def train_boston(config):
         verbose=0,
         validation_data=(X_test, y_test),  # tf reduce mean ignore tabnanny
         callbacks=callbacks_list)
-
-
-
-
 
 
 if __name__ == "__main__":
@@ -123,30 +125,30 @@ if __name__ == "__main__":
             # "mean_accuracy": 0.99,
             "training_iteration": 500
         },
-        num_samples=10,  # number of samples from hyperparameter space
+        num_samples=3000,  # number of samples from hyperparameter space
         reuse_actors=True,
         # Data and resources
         local_dir='~/ray_results',  # default value is ~/ray_results /root/ray_results/
         resources_per_trial={
-            "cpu": 1,
-            "gpu": 0.12
+            "cpu": 1  # ,
+            # "gpu": 0
         },
         config={
             # preprocessing parameters
             "n_categories": tune.choice([1, 2, 3, 6]),
+            "pca": tune.choice([True,False]),
             # training parameters
-            "batch": tune.choice([4]),
-            "learning_rate":tune.choice([1e-2]) ,#tune.loguniform(1e-5, 1e-2)
+            "batch": tune.choice([4,8]),
+            "learning_rate": tune.choice([1e-2]),  # tune.loguniform(1e-5, 1e-2)
             # Layer 1 params
             "hidden1": tune.randint(16, 200),
             "activation1": tune.choice(["elu"]),
-            "dropout1": tune.uniform(0.01, 0.15),
+            "dropout1": tune.quniform(0.05, 0.5,0.01),
             # Layer 2 params
             "hidden2": tune.randint(16, 129),
-            "dropout2": tune.uniform(0.05, 0.15),  # tune.choice([0.01, 0.02, 0.05, 0.1, 0.2])
+            "dropout2": tune.quniform(0.05, 0.5,0.01),  # tune.choice([0.01, 0.02, 0.05, 0.1, 0.2])
             "activation2": tune.choice(["elu"]),
             "activation_output": tune.choice(["elu"])
-
 
         }
 
