@@ -13,6 +13,12 @@ from sklearn.decomposition import PCA
 
 # A function to calculate Root Mean Squared Logarithmic Error (RMSLE)
 def rmsle(y_pred, y_test):
+
+    y_pred = tf.convert_to_tensor(y_pred, dtype=tf.float32)
+    y_pred = tf.clip_by_value(y_pred, clip_value_min=0, clip_value_max=np.inf)
+    y_test = tf.convert_to_tensor(y_test, dtype=tf.float32)
+    y_test = tf.clip_by_value(y_test, clip_value_min=0, clip_value_max=np.inf)
+
     return tf.math.sqrt(tf.reduce_mean((tf.math.log1p(y_pred) - tf.math.log1p(y_test)) ** 2))
 
 
@@ -21,6 +27,7 @@ def train_boston(config):
     import tensorflow as tf
     # print('Is cuda available for trainer:', tf.config.list_physical_devices('GPU'))
     epochs = 1000
+    config["learning_rate"]=1e-2
 
     # choose preprocessed features file
     XY_train_enc_file = f'/home/peterpirog/PycharmProjects/BostonHousesTune/data/XY_train_enc_' \
@@ -62,7 +69,7 @@ def train_boston(config):
     callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='val_rmsle',
                                                        patience=10),
                       tf.keras.callbacks.ReduceLROnPlateau(monitor='val_rmsle',
-                                                           factor=0.5,
+                                                           factor=0.1,
                                                            patience=5),
                       tf.keras.callbacks.ModelCheckpoint(filepath='my_model.h5',
                                                          monitor='val_rmsle',
@@ -136,17 +143,17 @@ if __name__ == "__main__":
         config={
             # preprocessing parameters
             "n_categories": tune.choice([1, 2, 3, 6]),
-            "pca": tune.choice([True,False]),
+            "pca": tune.choice([True, False]),
             # training parameters
-            "batch": tune.choice([4,8]),
-            "learning_rate": tune.choice([1e-2]),  # tune.loguniform(1e-5, 1e-2)
+            "batch": tune.choice([4, 8]),
+            #"learning_rate": tune.choice([1e-2]),  # tune.loguniform(1e-5, 1e-2)
             # Layer 1 params
             "hidden1": tune.randint(16, 200),
             "activation1": tune.choice(["elu"]),
-            "dropout1": tune.quniform(0.05, 0.5,0.01),
+            "dropout1": tune.quniform(0.05, 0.5, 0.01),
             # Layer 2 params
             "hidden2": tune.randint(16, 129),
-            "dropout2": tune.quniform(0.05, 0.5,0.01),  # tune.choice([0.01, 0.02, 0.05, 0.1, 0.2])
+            "dropout2": tune.quniform(0.05, 0.5, 0.01),  # tune.choice([0.01, 0.02, 0.05, 0.1, 0.2])
             "activation2": tune.choice(["elu"]),
             "activation_output": tune.choice(["elu"])
 
