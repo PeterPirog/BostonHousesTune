@@ -21,6 +21,9 @@ def train_boston(config):
     # print('Is cuda available for trainer:', tf.config.list_physical_devices('GPU'))
     num_classes = 1
     epochs = 1000
+    config["activation1"]='elu'
+    config["activation2"] = 'elu'
+    config["activation3"] = 'elu'
 
     # choose preprocessed features file
     XY_train_enc_file = f'/home/peterpirog/PycharmProjects/BostonHousesTune/data/XY_train_enc_' \
@@ -43,6 +46,11 @@ def train_boston(config):
                               activation=config["activation2"])(x)
     x = tf.keras.layers.LayerNormalization()(x)
     x = tf.keras.layers.Dropout(config["dropout2"])(x)
+    # layer 3
+    x = tf.keras.layers.Dense(units=config["hidden3"], kernel_initializer='glorot_normal',
+                              activation=config["activation3"])(x)
+    x = tf.keras.layers.LayerNormalization()(x)
+    x = tf.keras.layers.Dropout(config["dropout3"])(x)
 
     outputs = tf.keras.layers.Dense(units=num_classes, activation="elu")(x)
 
@@ -50,7 +58,7 @@ def train_boston(config):
 
     model.compile(
         loss=rmsle,  # mean_squared_logarithmic_error "mse"
-        optimizer=tf.keras.optimizers.Adam(learning_rate=config["learning_rate"]),
+        optimizer=tf.keras.optimizers.Adam(lr=config["lr"]),
         metrics=[rmsle])  # accuracy mean_squared_logarithmic_error
 
     callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='val_rmsle',
@@ -123,32 +131,37 @@ if __name__ == "__main__":
             # "mean_accuracy": 0.99,
             "training_iteration": 500
         },
-        num_samples=10,  # number of samples from hyperparameter space
+        num_samples=3000,  # number of samples from hyperparameter space
         reuse_actors=True,
         # Data and resources
         local_dir='~/ray_results',  # default value is ~/ray_results /root/ray_results/
         resources_per_trial={
             "cpu": 1,
-            "gpu": 0.12
+            "gpu": 0
         },
         config={
             # preprocessing parameters
             "n_categories": tune.choice([1, 2, 3, 6]),
             # training parameters
             "batch": tune.choice([4]),
-            "learning_rate":tune.choice([1e-2]) ,#tune.loguniform(1e-5, 1e-2)
+            "lr":tune.choice([1e-2]) ,#tune.loguniform(1e-5, 1e-2)
             # Layer 1 params
             "hidden1": tune.randint(16, 200),
-            "activation1": tune.choice(["elu"]),
+            #"activation1": tune.choice(["elu"]),
             "dropout1": tune.uniform(0.01, 0.15),
             # Layer 2 params
             "hidden2": tune.randint(16, 129),
             "dropout2": tune.uniform(0.05, 0.15),  # tune.choice([0.01, 0.02, 0.05, 0.1, 0.2])
-            "activation2": tune.choice(["elu"]),
-            "activation_output": tune.choice(["elu"])
+            #"activation2": tune.choice(["elu"]),
+            # Layer 3 params
+            "hidden3": tune.randint(16, 200),
+            #"activation3": tune.choice(["elu"]),
+            "dropout3": tune.uniform(0.01, 0.15)#,
+            #"activation_output": tune.choice(["elu"])
 
 
         }
 
     )
     print("Best hyperparameters found were: ", analysis.best_config)
+#https://colab.research.google.com/drive/1zjh0tUPYJYgJJunpLC9fW5uf--O0LKeZ?usp=sharing&hl=en

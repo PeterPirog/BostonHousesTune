@@ -21,6 +21,9 @@ def train_boston(config):
     # print('Is cuda available for trainer:', tf.config.list_physical_devices('GPU'))
     num_classes = 1
     epochs = 1000
+    config["activation1"]='elu'
+    config["activation2"] = 'elu'
+    config["activation_out"] = 'elu'
 
     # choose preprocessed features file
     XY_train_enc_file = f'/home/peterpirog/PycharmProjects/BostonHousesTune/data/XY_train_enc_' \
@@ -31,26 +34,31 @@ def train_boston(config):
 
     # define model
     inputs = tf.keras.layers.Input(shape=(X_train.shape[1]))
-    x = tf.keras.layers.Flatten()(inputs)
+    #x = tf.keras.layers.Flatten()(inputs)
+    #x = tf.keras.layers.LayerNormalization()(x)
+    # conv layer 1
+    x=tf.keras.layers.Conv1D(filters=config["filters1"],kernel_size=config["kernel_size1"],
+                             activation=config["activation1"])(inputs)
+    x = tf.keras.layers.Conv1D(filters=config["filters2"], kernel_size=config["kernel_size2"],
+                               activation=config["activation2"])(x)
     x = tf.keras.layers.LayerNormalization()(x)
-    # layer 1
+    x = tf.keras.layers.Dropout(config["dropout_conv"])(x)
+    x = tf.keras.layers.MaxPool1D(pool_size=2)
+    x = tf.keras.layers.Flatten()
+    x = tf.keras.layers.LayerNormalization()(x)
     x = tf.keras.layers.Dense(units=config["hidden1"], kernel_initializer='glorot_normal',
-                              activation=config["activation1"])(x)
-    x = tf.keras.layers.LayerNormalization()(x)
-    x = tf.keras.layers.Dropout(config["dropout1"])(x)
-    # layer 2
-    x = tf.keras.layers.Dense(units=config["hidden2"], kernel_initializer='glorot_normal',
-                              activation=config["activation2"])(x)
-    x = tf.keras.layers.LayerNormalization()(x)
-    x = tf.keras.layers.Dropout(config["dropout2"])(x)
-
+                              activation=config["activation_out"])(x)
+    x = tf.keras.layers.Dropout(config["dropout_d1"])(x)
     outputs = tf.keras.layers.Dense(units=num_classes, activation="elu")(x)
+
+
+
 
     model = tf.keras.Model(inputs=inputs, outputs=outputs, name="boston_model")
 
     model.compile(
         loss=rmsle,  # mean_squared_logarithmic_error "mse"
-        optimizer=tf.keras.optimizers.Adam(learning_rate=config["learning_rate"]),
+        optimizer=tf.keras.optimizers.Adam(lr=config["lr"]),
         metrics=[rmsle])  # accuracy mean_squared_logarithmic_error
 
     callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='val_rmsle',
@@ -129,23 +137,33 @@ if __name__ == "__main__":
         local_dir='~/ray_results',  # default value is ~/ray_results /root/ray_results/
         resources_per_trial={
             "cpu": 1,
-            "gpu": 0.12
+            "gpu": 0
         },
         config={
             # preprocessing parameters
             "n_categories": tune.choice([1, 2, 3, 6]),
             # training parameters
             "batch": tune.choice([4]),
-            "learning_rate":tune.choice([1e-2]) ,#tune.loguniform(1e-5, 1e-2)
-            # Layer 1 params
+            "lr":tune.choice([1e-2]) ,#tune.loguniform(1e-5, 1e-2)
+            #convolution filters
+            "filters1":tune.choice([16,32,64,128]),
+            "filters2": tune.choice([16,32,64,128]),
+            "kernel_size1":tune.randint(3, 10),
+            "kernel_size2": tune.randint(3, 10),
+            "dropout_conv": tune.quniform(0.01, 0.5, 0.01),
+
             "hidden1": tune.randint(16, 200),
-            "activation1": tune.choice(["elu"]),
-            "dropout1": tune.uniform(0.01, 0.15),
+            "dropout_d1":tune.quniform(0.01, 0.2, 0.01)
+
+            # Layer 1 params
+            #,
+            #"activation1": tune.choice(["elu"]),
+            #"dropout1": tune.uniform(0.01, 0.15),
             # Layer 2 params
-            "hidden2": tune.randint(16, 129),
-            "dropout2": tune.uniform(0.05, 0.15),  # tune.choice([0.01, 0.02, 0.05, 0.1, 0.2])
-            "activation2": tune.choice(["elu"]),
-            "activation_output": tune.choice(["elu"])
+            #"hidden2": tune.randint(16, 129),
+            #"dropout2": tune.uniform(0.05, 0.15),  # tune.choice([0.01, 0.02, 0.05, 0.1, 0.2])
+            #"activation2": tune.choice(["elu"]),
+            #"activation_output": tune.choice(["elu"])
 
 
         }

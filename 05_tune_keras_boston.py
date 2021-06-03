@@ -136,7 +136,7 @@ if __name__ == "__main__":
             # preprocessing parameters
             "n_categories": tune.choice([1, 2, 3, 6]),
             # training parameters
-            "batch": tune.choice([4, 8]),
+            "batch": tune.choice([4]),
             "lr": tune.loguniform(1e-5, 1e-2),
             # Layer 1 params
             "hidden1": tune.randint(16, 129),
