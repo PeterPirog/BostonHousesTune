@@ -1,11 +1,8 @@
-# https://www.machinecurve.com/index.php/2020/02/18/how-to-use-k-fold-cross-validation-with-keras/
-
+# UBUNTU
+from ray.tune.integration.keras import TuneReportCallback
 import numpy as np
-import tensorflow as tf  # tensorflow >= 2.5
 import pandas as pd
 
-
-import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
@@ -15,10 +12,12 @@ from category_encoders import OneHotEncoder
 from Transformers import QuantileTransformerDf, IterativeImputerDf, RareLabelNanEncoder
 from own_metrics import rmsle_tf, mre_tf
 
-if __name__ == "__main__":
-    # https://github.com/tensorflow/tensorflow/issues/32159
 
+def train_boston(config):
+    # https://github.com/tensorflow/tensorflow/issues/32159
+    import tensorflow as tf # tensorflow >= 2.5
     # print('Is cuda available for trainer:', tf.config.list_physical_devices('GPU'))
+    epochs = 1000
 
     # INITIAL CONFIGURATION
     config = {
@@ -134,38 +133,109 @@ if __name__ == "__main__":
         optimizer=tf.keras.optimizers.Adam(learning_rate=config["lr"]),
         metrics=[mre_tf])  # absolute relative error in %
 
-    # Define callbacks
     callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='val_mre_tf',
-                                                       patience=15),
+                                                       patience=10),
                       tf.keras.callbacks.ReduceLROnPlateau(monitor='val_mre_tf',
                                                            factor=0.1,
-                                                           patience=10)]  # ,
-    """
-                    tf.keras.callbacks.ModelCheckpoint(filepath='my_model.h5',
-                                                       monitor='val_rmsle_tf',
-                                                       save_best_only=True)]
-    """
-    # STEP 9 TRAIN NEURAL NET
-    history = model.fit(
+                                                           patience=5),
+                      tf.keras.callbacks.ModelCheckpoint(filepath='my_model.h5',
+                                                         monitor='val_rmsle',
+                                                         save_best_only=True),
+                      TuneReportCallback({'val_rmsle': 'val_rmsle'})]
+
+    model.fit(
         X_train,
         y_train,
         batch_size=config["batch"],
         epochs=epochs,
-        verbose=1,
-        validation_data=(X_test, y_test),
+        verbose=0,
+        validation_data=(X_test, y_test),  # tf reduce mean ignore tabnanny
         callbacks=callbacks_list)
 
-    history_dict = history.history
 
-    error = np.array(history.history['mre_tf'])
-    loss = np.array(history.history['loss'])
-    val_error = np.array(history.history['val_mre_tf'])
-    val_loss = np.array(history.history['val_loss'])
+if __name__ == "__main__":
+    import ray
+    from ray import tune
+    from ray.tune.schedulers import ASHAScheduler
+    import tensorflow as tf
 
-    start_iter = 20
-    plt.plot(loss[start_iter:], 'b', label="Błąd trenowania")
-    plt.plot(val_loss[start_iter:], 'bo', label="Błąd walidacji")
-    plt.xlabel("Epoki")
-    plt.ylabel('Strata')
-    plt.legend()
-    plt.show()
+    # print('Is cuda available for container:', tf.config.list_physical_devices('GPU'))
+    """
+    ray.init(num_cpus=8,
+             num_gpus=1,
+             include_dashboard=True,  # if you use docker use docker run -p 8265:8265 -p 6379:6379
+             dashboard_host='0.0.0.0')
+    """
+
+    try:
+        ray.init()
+    except:
+        ray.shutdown()
+        ray.init()
+
+    sched_asha = ASHAScheduler(time_attr="training_iteration",
+                               max_t=500,
+                               grace_period=16,
+                               # mode='max', #find maximum, do not define here if you define in tune.run
+                               reduction_factor=3,
+                               # brackets=1
+                               )
+
+    analysis = tune.run(
+        train_boston,
+        name="exp",
+        scheduler=sched_asha,
+        # Checkpoint settings
+        keep_checkpoints_num=3,
+        checkpoint_freq=3,
+        checkpoint_at_end=True,
+        verbose=3,
+        # Optimalization
+        metric="val_rmsle",  # mean_accuracy
+        mode="min",  # max
+        stop={
+            # "mean_accuracy": 0.99,
+            "training_iteration": 500
+        },
+        num_samples=3000,  # number of samples from hyperparameter space
+        reuse_actors=True,
+        # Data and resources
+        local_dir='~/ray_results',  # default value is ~/ray_results /root/ray_results/
+        resources_per_trial={
+            "cpu": 1  # ,
+            # "gpu": 0
+        },
+        config={
+            # preprocessing parameters
+            # RARE LABEL ENCODER  https://feature-engine.readthedocs.io/en/latest/encoding/RareLabelEncoder.html
+            "rare_tol": tune.choice([0.05, 0.02, 0.01, 0.001]),
+            # The minimum frequency a label should have to be considered frequent. Categories with frequencies lower than tol will be grouped
+            "n_categories": tune.choice([1, 2, 10]),
+            # he minimum number of categories a variable should have for the encoder to find
+            # frequent labels. If the variable contains less categories, all of them will be considered frequent.
+
+            # ITERATIVE IMPUTER https://scikit-learn.org/stable/modules/generated/sklearn.impute.IterativeImputer.html
+            "max_iter": tune.randint(3, 15),
+            "iter_tol": tune.choice([1e-3]),
+
+            # PCA DECOMPOSITION https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
+            "n_components": tune.choice([0.8, 0.9, 0.99]),
+            # number of components such that the amount of variance that needs to be explained is
+            # greater than the percentage specified by n_components.
+
+            # NEURAL NET PARAMETERS
+            "batch": tune.choice([4, 8]),
+            "lr": tune.choice([0.01]),
+            # Layer 1 params
+            "hidden1": tune.randint(16, 200),
+            "activation1": tune.choice(["elu"]),
+            "dropout1": tune.quniform(0.05, 0.5, 0.01),
+            # Layer 2 params
+            "hidden2": tune.randint(16, 200),
+            "dropout2": tune.quniform(0.05, 0.5, 0.01),
+            "activation2": tune.choice(["elu"]),
+            "activation_output": tune.choice(["elu"])
+        }
+
+    )
+    print("Best hyperparameters found were: ", analysis.best_config)
