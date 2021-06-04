@@ -15,14 +15,17 @@ from sklearn.decomposition import PCA
 
 
 # A function to calculate Root Mean Squared Logarithmic Error (RMSLE)
+# A function to calculate Root Mean Squared Logarithmic Error (RMSLE)
 def rmsle(y_pred, y_test):
+
+    y_pred = tf.convert_to_tensor(y_pred, dtype=tf.float32)
+    y_pred = tf.clip_by_value(y_pred, clip_value_min=0, clip_value_max=np.inf)
+    y_test = tf.convert_to_tensor(y_test, dtype=tf.float32)
+    y_test = tf.clip_by_value(y_test, clip_value_min=0, clip_value_max=np.inf)
+
     return tf.math.sqrt(tf.reduce_mean((tf.math.log1p(y_pred) - tf.math.log1p(y_test)) ** 2))
-#def rmsle(y_pred, y_test):
-#    m = tf.reduce_mean(tf.boolean_mask((tf.math.log1p(y_pred) - tf.math.log1p(y_test)) ** 2, tf.math.is_nan))
-#    return tf.math.sqrt(m)
 
 if __name__ == "__main__":
-
 
     # https://github.com/tensorflow/tensorflow/issues/32159
 
@@ -32,7 +35,7 @@ if __name__ == "__main__":
         # preprocessing parameters
         "n_categories": 6,
         # training parameters
-        "batch": 4,
+        "batch": 8,
         "lr": 0.01,
         # Layer 1 params
         "hidden1": 120,
@@ -63,11 +66,21 @@ if __name__ == "__main__":
 
     X_train=pca.transform(X_train)
     X_test = pca.transform(X_test)
-
+    print(f'X_train.shape={X_train.shape}')
 
 
     # define model
+    #inputs = tf.keras.layers.Input(shape=((X_train.shape[1],1)))
     inputs = tf.keras.layers.Input(shape=(X_train.shape[1]))
+    x=tf.keras.layers.Reshape(target_shape=(None,X_train.shape[1],1))(inputs)
+    x=tf.keras.layers.BatchNormalization()(x)
+    x=tf.keras.layers.Conv1D(filters=16,kernel_size=5,activation='selu',kernel_initializer='lecun_normal')(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.Conv1D(filters=32, kernel_size=5,activation='selu',kernel_initializer='lecun_normal')(x)
+    x = tf.keras.layers.Dropout(0.5)(x)
+    #x=tf.keras.layers.MaxPool1D(pool_size=2)(x)
+
+    """
     x = tf.keras.layers.Flatten()(inputs)
     x = tf.keras.layers.LayerNormalization()(x)
     # layer 1
@@ -81,7 +94,10 @@ if __name__ == "__main__":
     x = tf.keras.layers.LayerNormalization()(x)
     x = tf.keras.layers.Dropout(config["dropout2"])(x)
 
-    outputs = tf.keras.layers.Dense(units=1, activation=config["activation_output"])(x)
+    """
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    outputs = tf.keras.layers.Dense(units=1, activation='selu',kernel_initializer='lecun_normal')(x)
 
     model = tf.keras.Model(inputs=inputs, outputs=outputs, name="boston_model")
 

@@ -43,6 +43,12 @@ def get_Xy(XY_train_enc_file, test_size=0.1):
 
     return X_train, X_test, y_train, y_test
 
+def debug_array(array):
+    array=pd.DataFrame(array)
+    print(array.head())
+    print(array.info())
+    print(array.describe())
+
 if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
     get_Xy(n_categories=2)
