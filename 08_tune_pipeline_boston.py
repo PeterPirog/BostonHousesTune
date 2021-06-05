@@ -1,6 +1,7 @@
 # UBUNTU
 from ray.tune.integration.keras import TuneReportCallback
 import numpy as np
+from numpy import load, save
 import pandas as pd
 
 from sklearn.decomposition import PCA
@@ -10,7 +11,18 @@ from category_encoders import OneHotEncoder
 
 # Own functions and classes
 from Transformers import QuantileTransformerDf, IterativeImputerDf, RareLabelNanEncoder
-from own_metrics import rmsle_tf, mre_tf
+#from own_metrics import rmsle_tf, mre_tf
+
+# A function to calculate Root Mean Squared Logarithmic Error (RMSLE)
+
+def rmsle(y_pred, y_test):
+
+    y_pred = tf.convert_to_tensor(y_pred, dtype=tf.float32)
+    y_pred = tf.clip_by_value(y_pred, clip_value_min=0, clip_value_max=np.inf)
+    y_test = tf.convert_to_tensor(y_test, dtype=tf.float32)
+    y_test = tf.clip_by_value(y_test, clip_value_min=0, clip_value_max=np.inf)
+
+    return tf.math.sqrt(tf.reduce_mean((tf.math.log1p(y_pred) - tf.math.log1p(y_test)) ** 2))
 
 
 def train_boston(config):
@@ -19,89 +31,68 @@ def train_boston(config):
     # print('Is cuda available for trainer:', tf.config.list_physical_devices('GPU'))
     epochs = 1000
 
-    # INITIAL CONFIGURATION
-    config = {
-        # preprocessing parameters
-        # RARE LABEL ENCODER  https://feature-engine.readthedocs.io/en/latest/encoding/RareLabelEncoder.html
-        "rare_tol": 0.05,
-        # The minimum frequency a label should have to be considered frequent. Categories with frequencies lower than tol will be grouped
-        "n_categories": 10,  # he minimum number of categories a variable should have for the encoder to find
-        # frequent labels. If the variable contains less categories, all of them will be considered frequent.
+    #define train path to reuse
+    train_enc_file=f'X_train_enc_rare_tol_{config["rare_tol"]}_n_categories_{config["n_categories"]}_max_iter_{config["max_iter"]}_iter_tol_{config["iter_tol"]}.npy'
+    train_enc_path='/home/peterpirog/PycharmProjects/BostonHousesTune/data/encoded/'+train_enc_file
 
-        # ITERATIVE IMPUTER https://scikit-learn.org/stable/modules/generated/sklearn.impute.IterativeImputer.html
-        "max_iter": 10,
-        "iter_tol": 1e-3,
+    try:
+        X_train_encoded=load(file=train_enc_path)
+    except:
+        df_train = pd.read_csv('/home/peterpirog/PycharmProjects/BostonHousesTune/data/train.csv')
 
-        # PCA DECOMPOSITION https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
-        "n_components": 0.99,  # number of components such that the amount of variance that needs to be explained is
-        # greater than the percentage specified by n_components.
+        # csv preprcessing
+        df_train['MSSubClass'] = df_train['MSSubClass'].astype(dtype='category')  # convert fature to categorical
+        X_train = df_train.drop(['Id', 'SalePrice'], axis=1)
+        Y_train = df_train['SalePrice'].astype(dtype=np.float32)
 
-        # NEURAL NET PARAMETERS
-        "batch": 4,
-        "lr": 0.01,
-        # Layer 1 params
-        "hidden1": 120,
-        "activation1": "elu",
-        "dropout1": 0.4,
-        # Layer 2 params
-        "hidden2": 97,
-        "dropout2": 0.4,
-        "activation2": "elu",
-        "activation_output": "elu"
-    }
+        # PREPROCESSING
+        # STEP 1 -  categorical features rare labels encoding
+        rle = RareLabelNanEncoder(categories=None, tol=config['rare_tol'],
+                                  minimum_occurrences=None,
+                                  n_categories=config['n_categories'],
+                                  max_n_categories=None,
+                                  replace_with='Rare',
+                                  impute_missing_label=False,
+                                  additional_categories_list=None)
 
-    df_train = pd.read_csv('data/train.csv')
+        # STEP 2 - categorical features one hot encoding
+        # https://github.com/scikit-learn-contrib/category_encoders/blob/master/category_encoders/one_hot.py
+        ohe = OneHotEncoder(verbose=0, cols=None, drop_invariant=False, return_df=True,
+                            handle_missing='return_nan',  # options are 'error', 'return_nan', 'value', and 'indicator'.
+                            handle_unknown='return_nan',  # options are 'error', 'return_nan', 'value', and 'indicator'
+                            use_cat_names=False)
 
-    # csv preprcessing
-    df_train['MSSubClass'] = df_train['MSSubClass'].astype(dtype='category')  # convert fature to categorical
-    X_train = df_train.drop(['Id', 'SalePrice'], axis=1)
-    Y_train = df_train['SalePrice'].astype(dtype=np.float32)
+        # STEP 3 - numerical values quantile transformation with skewness removing
+        q_trans = QuantileTransformerDf(n_quantiles=1000, output_distribution='uniform', ignore_implicit_zeros=False,
+                                        subsample=1e5, random_state=42, copy=True, dataframe_as_output=True,
+                                        dtype=np.float32)
 
-    # PREPROCESSING
-    # STEP 1 -  categorical features rare labels encoding
-    rle = RareLabelNanEncoder(categories=None, tol=config['rare_tol'],
-                              minimum_occurrences=None,
-                              n_categories=config['n_categories'],
-                              max_n_categories=None,
-                              replace_with='Rare',
-                              impute_missing_label=False,
-                              additional_categories_list=None)
+        # STEP 4 - missing values multivariate imputation
+        imp = IterativeImputerDf(min_value=0,  # values from 0 to 1 for categorical for numeric
+                                 max_value=1,
+                                 random_state=42,
+                                 initial_strategy='median',
+                                 max_iter=config['max_iter'],
+                                 tol=config['iter_tol'],
+                                 verbose=0, dataframe_as_output=False)
+        # Step 5 PCA
+        pca = PCA(n_components=config['n_components'], svd_solver='full')
 
-    # STEP 2 - categorical features one hot encoding
-    # https://github.com/scikit-learn-contrib/category_encoders/blob/master/category_encoders/one_hot.py
-    ohe = OneHotEncoder(verbose=0, cols=None, drop_invariant=False, return_df=True,
-                        handle_missing='return_nan',  # options are 'error', 'return_nan', 'value', and 'indicator'.
-                        handle_unknown='return_nan',  # options are 'error', 'return_nan', 'value', and 'indicator'
-                        use_cat_names=False)
+        # STEP 6 MAKE PIPELINE AND TRAIN IT
+        pipe = Pipeline([
+            ('rare_lab', rle),
+            ('one_hot', ohe),
+            ('q_trans', q_trans),
+            ('imputer', imp),
+            ('pca', pca)
+        ])
 
-    # STEP 3 - numerical values quantile transformation with skewness removing
-    q_trans = QuantileTransformerDf(n_quantiles=1000, output_distribution='uniform', ignore_implicit_zeros=False,
-                                    subsample=1e5, random_state=42, copy=True, dataframe_as_output=True,
-                                    dtype=np.float32)
+        # Pipeline training
+        pipe.fit(X_train)
+        X_train_encoded = pipe.transform(X_train).astype(dtype=np.float32)
+        #save X_train_encoded array
+        save(file=train_enc_path,arr=X_train_encoded)
 
-    # STEP 4 - missing values multivariate imputation
-    imp = IterativeImputerDf(min_value=0,  # values from 0 to 1 for categorical for numeric
-                             max_value=1,
-                             random_state=42,
-                             initial_strategy='median',
-                             max_iter=config['max_iter'],
-                             tol=config['iter_tol'],
-                             verbose=0, dataframe_as_output=False)
-    # Step 5 PCA
-    pca = PCA(n_components=config['n_components'], svd_solver='full')
-
-    # STEP 6 MAKE PIPELINE AND TRAIN IT
-    pipe = Pipeline([
-        ('rare_lab', rle),
-        ('one_hot', ohe),
-        ('q_trans', q_trans),
-        ('imputer', imp),
-        ('pca', pca)
-    ])
-
-    # Pipeline training
-    pipe.fit(X_train)
-    X_train_encoded = pipe.transform(X_train)
 
     # STEP 7 SPLITTING DATA FOR KERAS
     X_train, X_test, y_train, y_test = train_test_split(X_train_encoded, Y_train,
@@ -129,13 +120,13 @@ def train_boston(config):
     model = tf.keras.Model(inputs=inputs, outputs=outputs, name="boston_model")
 
     model.compile(
-        loss=rmsle_tf,  # mean_squared_logarithmic_error
+        loss=rmsle,  # mean_squared_logarithmic_error
         optimizer=tf.keras.optimizers.Adam(learning_rate=config["lr"]),
-        metrics=[mre_tf])  # absolute relative error in %
+        metrics=[rmsle])  # absolute relative error in %
 
-    callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='val_mre_tf',
+    callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='val_rmsle',
                                                        patience=10),
-                      tf.keras.callbacks.ReduceLROnPlateau(monitor='val_mre_tf',
+                      tf.keras.callbacks.ReduceLROnPlateau(monitor='val_rmsle',
                                                            factor=0.1,
                                                            patience=5),
                       tf.keras.callbacks.ModelCheckpoint(filepath='my_model.h5',
@@ -195,9 +186,9 @@ if __name__ == "__main__":
         mode="min",  # max
         stop={
             # "mean_accuracy": 0.99,
-            "training_iteration": 500
+            "training_iteration": 1000
         },
-        num_samples=3000,  # number of samples from hyperparameter space
+        num_samples=10,  # number of samples from hyperparameter space
         reuse_actors=True,
         # Data and resources
         local_dir='~/ray_results',  # default value is ~/ray_results /root/ray_results/
@@ -208,18 +199,18 @@ if __name__ == "__main__":
         config={
             # preprocessing parameters
             # RARE LABEL ENCODER  https://feature-engine.readthedocs.io/en/latest/encoding/RareLabelEncoder.html
-            "rare_tol": tune.choice([0.05, 0.02, 0.01, 0.001]),
+            "rare_tol": tune.choice([0.05, 0.02, 0.01]),
             # The minimum frequency a label should have to be considered frequent. Categories with frequencies lower than tol will be grouped
             "n_categories": tune.choice([1, 2, 10]),
             # he minimum number of categories a variable should have for the encoder to find
             # frequent labels. If the variable contains less categories, all of them will be considered frequent.
 
             # ITERATIVE IMPUTER https://scikit-learn.org/stable/modules/generated/sklearn.impute.IterativeImputer.html
-            "max_iter": tune.randint(3, 15),
+            "max_iter": tune.choice([10,15,20]),
             "iter_tol": tune.choice([1e-3]),
 
             # PCA DECOMPOSITION https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
-            "n_components": tune.choice([0.8, 0.9, 0.99]),
+            "n_components": tune.choice([0.99]),
             # number of components such that the amount of variance that needs to be explained is
             # greater than the percentage specified by n_components.
 
