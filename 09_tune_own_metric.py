@@ -11,10 +11,11 @@ from category_encoders import OneHotEncoder
 
 # Own functions and classes
 from Transformers import QuantileTransformerDf, IterativeImputerDf, RareLabelNanEncoder
+from own_metrics import rmsle
 #from own_metrics import rmsle_tf, mre_tf
 
 # A function to calculate Root Mean Squared Logarithmic Error (RMSLE)
-
+"""
 def rmsle(y_pred, y_test):
 
     y_pred = tf.convert_to_tensor(y_pred, dtype=tf.float32)
@@ -23,23 +24,25 @@ def rmsle(y_pred, y_test):
     y_test = tf.clip_by_value(y_test, clip_value_min=0, clip_value_max=np.inf)
 
     return tf.math.sqrt(tf.reduce_mean((tf.math.log1p(y_pred) - tf.math.log1p(y_test)) ** 2))
-
+"""
 
 def train_boston(config):
     # https://github.com/tensorflow/tensorflow/issues/32159
     import tensorflow as tf # tensorflow >= 2.5
     # print('Is cuda available for trainer:', tf.config.list_physical_devices('GPU'))
-    epochs = 1000
+    epochs = 10000 #this values is not important because training will be stopped by EarlyStopping callback
 
     #define train path to reuse
     train_enc_file=f'X_train_enc_rare_tol_{config["rare_tol"]}_n_categories_{config["n_categories"]}_max_iter_{config["max_iter"]}_iter_tol_{config["iter_tol"]}.npy'
     train_enc_path='/home/peterpirog/PycharmProjects/BostonHousesTune/data/encoded/'+train_enc_file
+    y_train_path='/home/peterpirog/PycharmProjects/BostonHousesTune/data/encoded/y_train.npy'
 
     try:
         X_train_encoded=load(file=train_enc_path)
+        Y_train=load(file=y_train_path)
         #load only Y_train
-        df_train = pd.read_csv('/home/peterpirog/PycharmProjects/BostonHousesTune/data/train.csv')
-        Y_train = df_train['SalePrice'].astype(dtype=np.float32)
+        #df_train = pd.read_csv('/home/peterpirog/PycharmProjects/BostonHousesTune/data/train.csv')
+        #Y_train = df_train['SalePrice'].astype(dtype=np.float32)
     except:
         df_train = pd.read_csv('/home/peterpirog/PycharmProjects/BostonHousesTune/data/train.csv')
 
@@ -95,6 +98,7 @@ def train_boston(config):
         X_train_encoded = pipe.transform(X_train).astype(dtype=np.float32)
         #save X_train_encoded array
         save(file=train_enc_path,arr=X_train_encoded)
+        save(file=y_train_path, arr=Y_train)
 
 
     # STEP 7 SPLITTING DATA FOR KERAS
@@ -123,21 +127,18 @@ def train_boston(config):
     model = tf.keras.Model(inputs=inputs, outputs=outputs, name="boston_model")
 
     model.compile(
-        loss=rmsle,  # mean_squared_logarithmic_error
+        loss=rmsle,
         optimizer=tf.keras.optimizers.Adam(learning_rate=config["lr"]),
-        metrics=[rmsle])  # absolute relative error in %
+        metrics=[rmsle])
 
-    callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='val_rmsle',
+    callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                        patience=10),
-                      tf.keras.callbacks.ReduceLROnPlateau(monitor='val_rmsle',
+                      tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss',
                                                            factor=0.1,
-                                                           patience=5),
-                      tf.keras.callbacks.ModelCheckpoint(filepath='my_model.h5',
-                                                         monitor='val_rmsle',
-                                                         save_best_only=True),
-                      TuneReportCallback({'val_rmsle': 'val_rmsle'})]
+                                                           patience=5)]
 
-    model.fit(
+
+    history=model.fit(
         X_train,
         y_train,
         batch_size=config["batch"],
@@ -147,20 +148,18 @@ def train_boston(config):
         validation_data=(X_test, y_test),  # tf reduce mean ignore tabnanny
         callbacks=callbacks_list)
 
+    #Creating own metric
+    history_dict=history.history
+    loss=np.array(history.history['loss'])
+    val_loss=np.array(history.history['val_loss'])
+    result = np.mean(val_loss[-5] + np.abs(val_loss[-5] - loss[-5]))
+    ray.tune.report(_metric=result)
 
 if __name__ == "__main__":
     import ray
     from ray import tune
     from ray.tune.schedulers import ASHAScheduler
     import tensorflow as tf
-
-    # print('Is cuda available for container:', tf.config.list_physical_devices('GPU'))
-    """
-    ray.init(num_cpus=8,
-             num_gpus=1,
-             include_dashboard=True,  # if you use docker use docker run -p 8265:8265 -p 6379:6379
-             dashboard_host='0.0.0.0')
-    """
 
     try:
         ray.init()
@@ -186,7 +185,7 @@ if __name__ == "__main__":
         checkpoint_at_end=True,
         verbose=3,
         # Optimalization
-        metric="val_rmsle",  # mean_accuracy
+        #metric="val_rmsle",  # mean_accuracy
         mode="min",  # max
         stop={
             # "mean_accuracy": 0.99,
@@ -195,7 +194,7 @@ if __name__ == "__main__":
         num_samples=5000,  # number of samples from hyperparameter space
         reuse_actors=True,
         # Data and resources
-        local_dir='~/ray_results',  # default value is ~/ray_results /root/ray_results/
+        local_dir='/home/peterpirog/PycharmProjects/BostonHousesTune/ray_results',  # default value is ~/ray_results /root/ray_results/  or ~/ray_results
         resources_per_trial={
             "cpu": 1  # ,
             # "gpu": 0
@@ -214,7 +213,7 @@ if __name__ == "__main__":
             "iter_tol": tune.choice([1e-3]),
 
             # PCA DECOMPOSITION https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
-            "n_components": tune.choice([0.99]),
+            "n_components": tune.choice([0.999]),
             # number of components such that the amount of variance that needs to be explained is
             # greater than the percentage specified by n_components.
 
@@ -223,13 +222,13 @@ if __name__ == "__main__":
             "lr": tune.choice([0.01]),
             # Layer 1 params
             "hidden1": tune.randint(16, 200),
-            "activation1": tune.choice(["selu"]),
+            "activation1": tune.choice(["elu"]),
             "dropout1": tune.quniform(0.05, 0.5, 0.01),
             # Layer 2 params
             "hidden2": tune.randint(16, 200),
             "dropout2": tune.quniform(0.05, 0.5, 0.01),
-            "activation2": tune.choice(["selu"]),
-            "activation_output": tune.choice(["selu"])
+            "activation2": tune.choice(["elu"]),
+            "activation_output": tune.choice(["relu",None])
         }
 
     )

@@ -4,21 +4,30 @@ import numpy as np
 import scipy.stats as st
 import math
 
-
+"""
 def mre(y_true, y_pred):
     # implementation of mean relative error in percents
     MRE = np.abs((y_pred - y_true) / y_true)
     MRE = np.mean(MRE)
     return 100 * MRE
+"""
 
-
-def mre_tf(y_true, y_pred):
+def mre(y_true, y_pred):
     # implementation of mean relative error in percents
     # Convert nparrays  to tensors
     y_true = tf.convert_to_tensor(y_true, dtype=tf.float32)
     y_pred = tf.convert_to_tensor(y_pred, dtype=tf.float32)
     MRE = tf.math.abs((y_pred - y_true) / y_true)
     MRE = tf.reduce_mean(MRE)
+    return 100 * MRE
+
+def mremax(y_true, y_pred):
+    # implementation of mean relative error in percents
+    # Convert nparrays  to tensors
+    y_true = tf.convert_to_tensor(y_true, dtype=tf.float32)
+    y_pred = tf.convert_to_tensor(y_pred, dtype=tf.float32)
+    MRE = tf.math.abs((y_pred - y_true) / y_true)
+    MRE = tf.math.reduce_max(MRE)
     return 100 * MRE
 
 
@@ -29,13 +38,13 @@ def mre_bound(y_true, y_pred):
     upper_bound = st.t.interval(0.95, len(err) - 1, loc=np.mean(err), scale=st.sem(err))[1]
     return upper_bound
 
-
+"""
 # A function to calculate Root Mean Squared Logarithmic Error (RMSLE)
 def rmsle(y_true, y_pred):
     return np.sqrt(np.mean((np.log1p(y_pred) - np.log1p(y_true)) ** 2))
+"""
 
-
-def rmsle_tf(y_true, y_pred):
+def rmsle(y_true, y_pred):
     # Convert nparrays  to tensors
     y_true = tf.convert_to_tensor(y_true, dtype=tf.float32)
     y_pred = tf.convert_to_tensor(y_pred, dtype=tf.float32)
@@ -44,6 +53,16 @@ def rmsle_tf(y_true, y_pred):
     y_true = tf.clip_by_value(y_true, clip_value_min=0, clip_value_max=np.inf)
     y_pred = tf.clip_by_value(y_pred, clip_value_min=0, clip_value_max=np.inf)
     return tf.math.sqrt(tf.reduce_mean((tf.math.log1p(y_pred) - tf.math.log1p(y_true)) ** 2))
+
+def rmslemax(y_true, y_pred):
+    # Convert nparrays  to tensors
+    y_true = tf.convert_to_tensor(y_true, dtype=tf.float32)
+    y_pred = tf.convert_to_tensor(y_pred, dtype=tf.float32)
+
+    # Clip values to prevent log from values below 0
+    y_true = tf.clip_by_value(y_true, clip_value_min=0, clip_value_max=np.inf)
+    y_pred = tf.clip_by_value(y_pred, clip_value_min=0, clip_value_max=np.inf)
+    return tf.math.sqrt(tf.math.reduce_max((tf.math.log1p(y_pred) - tf.math.log1p(y_true)) ** 2))
 
 
 if __name__ == '__main__':
