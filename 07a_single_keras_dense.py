@@ -12,19 +12,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from tensorflow.keras.utils import plot_model
-from own_metrics import rmsle,mre,rmslemax,mremax
+#from own_metrics import rmsle,mre,rmslemax,mremax
+from nn_tools import build_dense2L_model
 
-"""
-# A function to calculate Root Mean Squared Logarithmic Error (RMSLE)
-def rmsle(y_pred, y_test):
-
-    y_pred = tf.convert_to_tensor(y_pred, dtype=tf.float32)
-    y_pred = tf.clip_by_value(y_pred, clip_value_min=0, clip_value_max=np.inf)
-    y_test = tf.convert_to_tensor(y_test, dtype=tf.float32)
-    y_test = tf.clip_by_value(y_test, clip_value_min=0, clip_value_max=np.inf)
-
-    return tf.math.sqrt(tf.reduce_mean((tf.math.log1p(y_pred) - tf.math.log1p(y_test)) ** 2))
-"""
 
 if __name__ == "__main__":
 
@@ -40,22 +30,18 @@ if __name__ == "__main__":
         "batch": 30,
         "lr": 0.01,
         # Layer 1 params
-        "hidden1": 180,#120
-        "activation1": "selu",
-        "dropout1": 0.2, #0.08
+        "hidden1": 180,
+        "activation1": "elu",
+        "dropout1": 0.2,
         # Layer 2 params
-        "hidden2": 150,#97
-        "dropout2": 0.2,#0.075
-        "activation2": "selu",
-        "activation_output": "selu"}
+        "hidden2": 150,
+        "dropout2": 0.2,
+        "activation2": "elu",
+        "activation_output": "elu"}
 
     epochs = 1000
 
 
-    # choose preprocessed features file
-    #For UBUNTU
-    #XY_train_enc_file = f'/home/peterpirog/PycharmProjects/BostonHousesTune/data/XY_train_enc_' \
-    #                    f'{str(config["n_categories"])}_0.05.csv'
 
     XY_train_enc_file = f'data/XY_train_enc_{str(config["n_categories"])}_0.05.csv'
     X_train, X_test, y_train, y_test = get_Xy(XY_train_enc_file=XY_train_enc_file)
@@ -69,46 +55,20 @@ if __name__ == "__main__":
     X_train=pca.transform(X_train)
     X_test = pca.transform(X_test)
 
-
-
-    # define model
-    inputs = tf.keras.layers.Input(shape=(X_train.shape[1]))
-    #x = tf.keras.layers.Flatten()(inputs)
-    x = tf.keras.layers.BatchNormalization()(inputs)
-    # layer 1
-    x = tf.keras.layers.Dense(units=config["hidden1"], kernel_initializer='lecun_normal',
-                              activation=config["activation1"])(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dropout(config["dropout1"])(x)
-    # layer 2
-    x = tf.keras.layers.Dense(units=config["hidden2"], kernel_initializer='lecun_normal',
-                              activation=config["activation2"])(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dropout(config["dropout2"])(x)
-
-    outputs = tf.keras.layers.Dense(units=1, activation=config["activation_output"])(x)
-
-    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="boston_model")
-
-    model.summary()
-    plot_model(model, to_file='model.png', show_shapes=True)
-
-    model.compile(
-        loss=rmsle,  # mean_squared_logarithmic_error "mse"
-        optimizer=tf.keras.optimizers.Adam(learning_rate=config["lr"]),
-        metrics=[mre])  # accuracy mean_squared_logarithmic_error tf.keras.metrics.MeanSquaredLogarithmicError()
+    #Call function to make dense 2 layer net
+    model=build_dense2L_model(config=config,X_train=X_train)
 
     #Define callbacks
     callbacks_list=[tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                      patience=15),
                     tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss',
                                                          factor=0.1,
-                                                         patience=10)]#,
-    """
+                                                         patience=10),
+    
                     tf.keras.callbacks.ModelCheckpoint(filepath='my_model.h5',
                                                        monitor='val_rmsle',
                                                        save_best_only=True)]
-    """
+
 
     history=model.fit(
         X_train,
@@ -124,9 +84,9 @@ if __name__ == "__main__":
     #print(f'keys:{history_dict.keys()}')
 
 
-    error=np.array(history.history['mre'])
+    error=np.array(history.history['accuracy'])
     loss=np.array(history.history['loss'])
-    val_error=np.array(history.history['val_mre'])
+    val_error=np.array(history.history['val_accuracy'])
     val_loss=np.array(history.history['val_loss'])
 
     start_iter=20

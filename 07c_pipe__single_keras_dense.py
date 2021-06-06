@@ -13,7 +13,7 @@ from category_encoders import OneHotEncoder
 
 # Own functions and classes
 from Transformers import QuantileTransformerDf, IterativeImputerDf, RareLabelNanEncoder
-from own_metrics import rmsle_tf, mre_tf
+from trash.own_metrics import rmsle_tf, mre_tf
 
 if __name__ == "__main__":
     # https://github.com/tensorflow/tensorflow/issues/32159

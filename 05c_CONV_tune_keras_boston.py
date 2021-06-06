@@ -31,7 +31,7 @@ def train_boston(config):
     #XY_train_enc_file = f'data/X_train_enc_{str(config["n_categories"])}_0.05.csv'
 
     X_train, X_test, y_train, y_test = get_Xy(XY_train_enc_file=XY_train_enc_file)
-
+    print(X_train.shape[1])
     # define model
     inputs = tf.keras.layers.Input(shape=(X_train.shape[1]))
     #x = tf.keras.layers.Flatten()(inputs)

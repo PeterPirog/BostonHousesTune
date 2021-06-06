@@ -4,7 +4,16 @@ import joblib
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+from sklearn.pipeline import Pipeline
+
 import tensorflow as tf
+from numpy import load, save
+from category_encoders import OneHotEncoder
+
+# Own functions and classes
+from Transformers import QuantileTransformerDf, IterativeImputerDf, RareLabelNanEncoder
+
 
 
 def make_submission(trained_regressor,
@@ -48,6 +57,83 @@ def debug_array(array):
     print(array.head())
     print(array.info())
     print(array.describe())
+
+def make_preprocessing(config):
+    train_enc_file = f'X_train_enc_rare_tol_{config["rare_tol"]}_n_categories_{config["n_categories"]}_max_iter_{config["max_iter"]}_iter_tol_{config["iter_tol"]}.npy'
+    train_enc_path = '/home/peterpirog/PycharmProjects/BostonHousesTune/data/encoded/' + train_enc_file
+    y_train_path = '/home/peterpirog/PycharmProjects/BostonHousesTune/data/encoded/y_train.npy'
+
+    try:
+        X_train_encoded = load(file=train_enc_path)
+        Y_train = load(file=y_train_path)
+
+    except:
+        df_train = pd.read_csv('/home/peterpirog/PycharmProjects/BostonHousesTune/data/train.csv')
+
+        # csv preprcessing
+        df_train['MSSubClass'] = df_train['MSSubClass'].astype(dtype='category')  # convert feature to categorical
+        X_train = df_train.drop(['Id', 'SalePrice'], axis=1)
+        Y_train = df_train['SalePrice'].astype(dtype=np.float32)
+
+        # PREPROCESSING
+        # STEP 1 -  categorical features rare labels encoding
+        rle = RareLabelNanEncoder(categories=None, tol=config['rare_tol'],
+                                  minimum_occurrences=None,
+                                  n_categories=config['n_categories'],
+                                  max_n_categories=None,
+                                  replace_with='Rare',
+                                  impute_missing_label=False,
+                                  additional_categories_list=None)
+
+        # STEP 2 - categorical features one hot encoding
+        # https://github.com/scikit-learn-contrib/category_encoders/blob/master/category_encoders/one_hot.py
+        ohe = OneHotEncoder(verbose=0, cols=None, drop_invariant=False, return_df=True,
+                            handle_missing='return_nan',  # options are 'error', 'return_nan', 'value', and 'indicator'.
+                            handle_unknown='return_nan',  # options are 'error', 'return_nan', 'value', and 'indicator'
+                            use_cat_names=False)
+
+        # STEP 3 - numerical values quantile transformation with skewness removing
+        q_trans = QuantileTransformerDf(n_quantiles=1000, output_distribution='uniform', ignore_implicit_zeros=False,
+                                        subsample=1e5, random_state=42, copy=True, dataframe_as_output=True,
+                                        dtype=np.float32)
+
+        # STEP 4 - missing values multivariate imputation
+        imp = IterativeImputerDf(min_value=0,  # values from 0 to 1 for categorical for numeric
+                                 max_value=1,
+                                 random_state=42,
+                                 initial_strategy='median',
+                                 max_iter=config['max_iter'],
+                                 tol=config['iter_tol'],
+                                 verbose=0, dataframe_as_output=False)
+        # Step 5 PCA
+        pca = PCA(n_components=config['n_components'], svd_solver='full')
+
+        # STEP 6 MAKE PIPELINE AND TRAIN IT
+        pipe = Pipeline([
+            ('rare_lab', rle),
+            ('one_hot', ohe),
+            ('q_trans', q_trans),
+            ('imputer', imp),
+            ('pca', pca)
+        ])
+
+        # Pipeline training
+        pipe.fit(X_train)
+        X_train_encoded = pipe.transform(X_train).astype(dtype=np.float32)
+        # save X_train_encoded array
+        save(file=train_enc_path, arr=X_train_encoded)
+        save(file=y_train_path, arr=Y_train)
+
+    # STEP 7 SPLITTING DATA FOR KERAS
+    X_train, X_test, y_train, y_test = train_test_split(X_train_encoded, Y_train,
+                                                        shuffle=True,
+                                                        test_size=0.2,
+                                                        random_state=42)
+    return X_train, X_test, y_train, y_test
+
+
+
+
 
 if __name__ == '__main__':
     pd.set_option('display.max_columns', None)

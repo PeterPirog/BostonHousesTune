@@ -31,6 +31,12 @@ def train_boston(config):
     # https://github.com/tensorflow/tensorflow/issues/32159
     import tensorflow as tf # tensorflow >= 2.5
 
+
+    if config['hidden1']<config['hidden2'] or config['hidden2']<config['hidden3']:
+        ray.tune.report(_metric=1)
+        exit()
+
+
     # print('Is cuda available for trainer:', tf.config.list_physical_devices('GPU'))
     epochs = 10000 #this values is not important because training will be stopped by EarlyStopping callback
 
@@ -125,6 +131,13 @@ def train_boston(config):
                               activation=config["activation2"])(x)
     x = tf.keras.layers.LayerNormalization()(x)
     x = tf.keras.layers.Dropout(config["dropout2"])(x)
+    # layer 3
+    x = tf.keras.layers.Dense(units=config["hidden3"], kernel_initializer='glorot_normal',
+                              activation=config["activation3"])(x)
+    x = tf.keras.layers.LayerNormalization()(x)
+    x = tf.keras.layers.Dropout(config["dropout3"])(x)
+
+    #Output layer
     outputs = tf.keras.layers.Dense(units=1, activation=config["activation_output"])(x)
     model = tf.keras.Model(inputs=inputs, outputs=outputs, name="boston_model")
 
@@ -179,7 +192,7 @@ if __name__ == "__main__":
 
     analysis = tune.run(
         train_boston,
-        name="exp",
+        name="exp3",
         scheduler=sched_asha,
         # Checkpoint settings
         keep_checkpoints_num=3,
@@ -206,12 +219,12 @@ if __name__ == "__main__":
             # RARE LABEL ENCODER  https://feature-engine.readthedocs.io/en/latest/encoding/RareLabelEncoder.html
             "rare_tol": tune.choice([0.01]),
             # The minimum frequency a label should have to be considered frequent. Categories with frequencies lower than tol will be grouped
-            "n_categories": tune.choice([1, 2, 10]),
+            "n_categories": tune.choice([2]),
             # he minimum number of categories a variable should have for the encoder to find
             # frequent labels. If the variable contains less categories, all of them will be considered frequent.
 
             # ITERATIVE IMPUTER https://scikit-learn.org/stable/modules/generated/sklearn.impute.IterativeImputer.html
-            "max_iter": tune.choice([10,15,20]),
+            "max_iter": tune.choice([20]),
             "iter_tol": tune.choice([1e-3]),
 
             # PCA DECOMPOSITION https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
@@ -223,16 +236,21 @@ if __name__ == "__main__":
             "batch": tune.choice([4]),
             "lr": tune.choice([0.01]),
             # Layer 1 params
-            "hidden1": tune.randint(16, 200),
+            "hidden1": tune.randint(16, 151),
             "activation1": tune.choice(["elu"]),
-            "dropout1": tune.quniform(0.05, 0.5, 0.01),
+            "dropout1": tune.quniform(0.04, 0.5, 0.02),
             # Layer 2 params
-            "hidden2": tune.randint(16, 200),
-            "dropout2": tune.quniform(0.05, 0.5, 0.01),
+            "hidden2": tune.randint(16, 121),
+            "dropout2": tune.quniform(0.04, 0.5, 0.02),
             "activation2": tune.choice(["elu"]),
-            "activation_output": tune.choice(['relu','linear'])
+            # Layer 3 params
+            "hidden3": tune.randint(16, 51),
+            "dropout3": tune.quniform(0.04, 0.5, 0.02),
+            "activation3": tune.choice(["elu"]),
+            #output layer
+            "activation_output": tune.choice(['linear'])
         }
 
     )
     print("Best hyperparameters found were: ", analysis.best_config)
-    #tensorboard --logdir /home/peterpirog/PycharmProjects/BostonHousesTune/ray_results --bind_all
+    #tensorboard --logdir /home/peterpirog/PycharmProjects/BostonHousesTune/ray_results/exp3 --bind_all

@@ -1,11 +1,10 @@
 # https://www.youtube.com/watch?v=5nYqK-HaoKY
 import pandas as pd
-import numpy as np
 import joblib
 
-from sklearn import ensemble, metrics, model_selection
+from sklearn import ensemble, model_selection
 from sklearn.metrics import make_scorer
-from own_metrics import mre,mre_bound,rmsle
+from trash.own_metrics import rmsle
 
 if __name__ == "__main__":
     #Rare encoder options
