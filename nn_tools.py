@@ -193,6 +193,7 @@ def build_conv3L_model(config, X_train):
 
     x = tf.keras.layers.MaxPool1D(pool_size=2, name='MaxPooling1D')(x)
     x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dropout(config['dropout_c3'])(x)
     x = tf.keras.layers.Dense(units=config['hidden_conv'],
                               activation=config['activation_hidden_conv'],
                               kernel_initializer='lecun_normal',
@@ -209,7 +210,113 @@ def build_conv3L_model(config, X_train):
         optimizer=tf.keras.optimizers.Adam(learning_rate=config["lr"]),
         metrics=[rmsle])
     return model
+def build_mixed_model(config, X_train):
+    # Implementation of dense 2 layer network with config keys:
+    """
+    config = {
+        "lr": 0.01,
+        #CNN LAYERS
+            # Layer 1 params
+        "filter1": 32,
+        "kernel1":5,
+        "activation_c1": "elu",
+        "dropout_c1": 0.4, #0.08
+            # Layer 2 params
+        "filter2": 32,
+        "kernel2": 5,
+        "activation_c2": "elu",
+            # Layer 3 params
+        "filter3": 32,
+        "kernel3": 5,
+        "activation_c3": "elu",
+            #output layers
+        "hidden_conv":32
+        "activation_hidden_conv":"elu"
+        #DENSE LAYERS
+                    # Layer 1 params
+        "hidden1": 180,
+        "activation1": "selu",
+        "dropout1": 0.2,
+            # Layer 2 params
+        "hidden2": 150,
+        "dropout2": 0.2,
+        "activation2": "selu",
+            # Layer 3 params
+        "hidden3": 150,
+        "dropout3": 0.2,
+        "activation3": "selu"
 
+
+        "activation_output": "linear"}
+    """
+
+    inputs = tf.keras.layers.Input(shape=(X_train.shape[1]))
+    input_conv = tf.keras.layers.Reshape(target_shape=(-1, X_train.shape[1], 1))(inputs)
+
+    #CONVOLUTION PART
+    # Layer 1
+    x = tf.keras.layers.Conv1D(filters=config['filter1'],
+                               kernel_size=config['kernel1'],
+                               activation=config['activation_c1'],
+                               kernel_initializer='glorot_normal',
+                               name='Conv1D_1')(input_conv)
+    x = tf.keras.layers.Dropout(config['dropout_c1'])(x)
+    # Layer 2
+    x = tf.keras.layers.Conv1D(filters=config['filter2'],
+                               kernel_size=config['kernel2'],
+                               activation=config['activation_c2'],
+                               kernel_initializer='lecun_normal',
+                               name='Conv1D_2')(x)
+    x = tf.keras.layers.Conv1D(filters=config['filter3'],
+                               kernel_size=config['kernel3'],
+                               activation=config['activation_c3'],
+                               kernel_initializer='lecun_normal',
+                               name='Conv1D_3')(x)
+    x = tf.keras.layers.Reshape((np.shape(x)[2], np.shape(x)[3]))(x)
+
+    x = tf.keras.layers.MaxPool1D(pool_size=2, name='MaxPooling1D')(x)
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dropout(config['dropout_c3'])(x)
+    output_conv = tf.keras.layers.Dense(units=config['hidden_conv'],
+                              activation=config['activation_hidden_conv'],
+                              kernel_initializer='lecun_normal',
+                              name='Dense_Conv1D')(x)
+
+    #DENSE PART
+    x = tf.keras.layers.LayerNormalization()(inputs)
+    # layer 1
+    x = tf.keras.layers.Dense(units=config["hidden1"], kernel_initializer='glorot_normal',
+                              activation=config["activation1"],
+                              name='Dense_1')(x)
+    x = tf.keras.layers.LayerNormalization()(x)
+    x = tf.keras.layers.Dropout(config["dropout1"])(x)
+    # layer 2
+    x = tf.keras.layers.Dense(units=config["hidden2"], kernel_initializer='glorot_normal',
+                              activation=config["activation2"],
+                              name='Dense_2')(x)
+    x = tf.keras.layers.LayerNormalization()(x)
+    x = tf.keras.layers.Dropout(config["dropout2"])(x)
+    # layer 3
+    x = tf.keras.layers.Dense(units=config["hidden3"], kernel_initializer='glorot_normal',
+                              activation=config["activation3"],
+                              name='Dense_3')(x)
+    x = tf.keras.layers.LayerNormalization()(x)
+    output_dense = tf.keras.layers.Dropout(config["dropout3"])(x)
+
+    #Merge layers
+    concatted = tf.keras.layers.Concatenate()([output_conv, output_dense])
+    output = tf.keras.layers.Dense(units=1,
+                                    activation=config['activation_output'],
+                                    kernel_initializer='lecun_normal',
+                                    name='Dense_Conv1D_out')(concatted)
+
+    model = tf.keras.Model(inputs=inputs, outputs=output, name="boston_model")
+
+    model.compile(
+        loss=rmsle,
+        optimizer=tf.keras.optimizers.Adam(learning_rate=config["lr"]),
+        metrics=[rmsle])
+    return model
 def make_preprocessing(config):
     train_enc_file = f'X_train_enc_rare_tol_{config["rare_tol"]}_n_categories_{config["n_categories"]}_max_iter_{config["max_iter"]}_iter_tol_{config["iter_tol"]}.npy'
     train_enc_path = '/home/peterpirog/PycharmProjects/BostonHousesTune/data/encoded/' + train_enc_file
