@@ -58,11 +58,16 @@ if __name__ == "__main__":
         "activation_output": "linear"}
 
 
-    X_train, X_test, y_train, y_test=make_preprocessing(config=config)
+    X_train_orig, X_test, y_train, y_test=make_preprocessing(config=config)
+
+    X_train=tf.data.Dataset.from_tensor_slices(X_train_orig)
+    X_test = tf.data.Dataset.from_tensor_slices(X_test)
+    y_train = tf.data.Dataset.from_tensor_slices(y_train)
+    y_test = tf.data.Dataset.from_tensor_slices(y_test)
 
 
     epochs = 1000
-    model = build_mixed_model(config=config, X_train=X_train)
+    model = build_mixed_model(config=config, X_train=X_train_orig)
     model.summary()
     # Define callbacks
     callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='loss',  #'val_loss

@@ -13,7 +13,7 @@ from category_encoders import OneHotEncoder
 
 # Own functions and classes
 #from Transformers import QuantileTransformerDf, IterativeImputerDf, RareLabelNanEncoder
-from nn_tools import build_mixed_model,rmsle,make_preprocessing
+from nn_tools import build_mixed_model,rmsle,make_preprocessing,build_encoder_model
 
 def train_boston(config):
     # https://github.com/tensorflow/tensorflow/issues/32159
@@ -29,7 +29,7 @@ def train_boston(config):
     X_train, X_test, y_train, y_test=make_preprocessing(config=config)
 
     epochs = 1000
-    model = build_mixed_model(config=config, X_train=X_train)
+    model = build_encoder_model(config=config, X_train=X_train)
     # Define callbacks
     callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                        patience=15),
@@ -53,9 +53,9 @@ def train_boston(config):
 
     #Creating own metric
     history_dict=history.history
-    loss=np.array(history.history['loss'])
-    val_loss=np.array(history.history['val_loss'])
-    result = np.mean(val_loss[-5] + np.abs(val_loss[-5] - loss[-5]))
+    #loss=np.array(history.history['loss'])
+    #val_loss=np.array(history.history['val_loss'])
+    #result = np.mean(val_loss[-5] + np.abs(val_loss[-5] - loss[-5]))
     #ray.tune.report(_metric=result)
 
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
     analysis = tune.run(
         train_boston,
-        name="exp_mix_metric2",
+        name="exp_encoder",
         scheduler=sched_asha,
         # Checkpoint settings
         keep_checkpoints_num=3,
@@ -107,7 +107,7 @@ if __name__ == "__main__":
             # preprocessing parameters
             # RARE LABEL ENCODER  https://feature-engine.readthedocs.io/en/latest/encoding/RareLabelEncoder.html
             # The minimum frequency a label should have to be considered frequent. Categories with frequencies lower than tol will be grouped
-            "rare_tol": tune.choice([0.01]),
+            "rare_tol": tune.choice([0.001]),
             # The minimum number of categories a variable should have for the encoder to find
             # frequent labels. If the variable contains less categories, all of them will be considered frequent.
             "n_categories": tune.choice([2]),
@@ -118,7 +118,7 @@ if __name__ == "__main__":
             "iter_tol": tune.choice([0.001]),
 
             # PCA DECOMPOSITION https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
-            "n_components": tune.choice([0.999]),
+            "n_components": tune.choice([1.0]),
             # number of components such that the amount of variance that needs to be explained is
             # greater than the percentage specified by n_components.
 
@@ -161,4 +161,4 @@ if __name__ == "__main__":
             "activation_output": tune.choice(["linear"])}
     )
     print("Best hyperparameters found were: ", analysis.best_config)
-    #tensorboard --logdir /home/peterpirog/PycharmProjects/BostonHousesTune/ray_results/exp_mix_metric2 --bind_all
+    #tensorboard --logdir /home/peterpirog/PycharmProjects/BostonHousesTune/ray_results/exp_encoder --bind_all

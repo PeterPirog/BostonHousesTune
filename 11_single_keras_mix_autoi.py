@@ -23,46 +23,54 @@ if __name__ == "__main__":
         # training parameters
         "batch": 8,
         "lr": 0.01,
-            #CONVOLUTION PART
-        # Layer 1 params
-        "filter1": 64,
-        "kernel1": 9,
-        "activation_c1": "elu",
-        "dropout_c1": 0.24,
-        # Layer 2 params
-        "filter2": 16,
-        "kernel2": 7,
-        "activation_c2": "elu",
-        # Layer 3 params
-        "filter3": 16,
-        "kernel3": 2,
-        "activation_c3": "elu",
-        "dropout_c3": 0.04,
-        # output layers
-        "hidden_conv": 10,#87
-        "activation_hidden_conv": "elu",
+
             #DENSE PART
         # Layer 1 params
-        "hidden1": 40,#142
+        "hidden1": 100,#142
         "activation1": "elu",
-        "dropout1": 0.3,
+        #"dropout1": 0.3,
         # Layer 2 params
-        "hidden2": 26,
-        "dropout2": 0.3,
-        "activation2": "elu",
+        "hidden_enc": 50,
+        #"dropout2": 0.3,
+        "activation_enc": "sigmoid",
         # Layer 3 params
-        "hidden3": 10,
-        "dropout3": 0.28,
-        "activation3": "elu",
+        #"hidden3": 10,
+        #"dropout3": 0.28,
+        #"activation3": "elu",
         #OUTPUT
         "activation_output": "linear"}
 
 
     X_train, X_test, y_train, y_test=make_preprocessing(config=config)
-
+    print(f'The input shape is:{X_train.shape[1]}')
 
     epochs = 1000
-    model = build_mixed_model(config=config, X_train=X_train)
+
+    inputs = tf.keras.layers.Input(shape=(X_train.shape[1]))
+    #x = tf.keras.layers.LayerNormalization()(inputs)
+    # layer 1
+    x = tf.keras.layers.Dense(units=config['hidden1'], kernel_initializer='glorot_normal',
+                              activation=config['activation_enc'])(inputs)
+    x = tf.keras.layers.LayerNormalization()(x)
+    # layer 2
+    enc_layer = tf.keras.layers.Dense(units=config['hidden_enc'], kernel_initializer='glorot_normal',
+                              activation=config['activation_enc'])(x)
+    #x = tf.keras.layers.LayerNormalization()(enc_layer)
+    x = tf.keras.layers.Dense(units=config['hidden1'], kernel_initializer='glorot_normal',
+                              activation=config['activation1'])(x)
+    # Output layer
+    outputs = tf.keras.layers.Dense(units=X_train.shape[1], activation='linear')(x)
+
+
+    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="boston_model")
+    encoder = tf.keras.Model(inputs=inputs, outputs=enc_layer, name="encoder")
+
+    model.compile(
+        loss='mae',
+        optimizer=tf.keras.optimizers.Adam(learning_rate=config["lr"]),
+        metrics='mae')
+
+
     model.summary()
     # Define callbacks
     callbacks_list = [tf.keras.callbacks.EarlyStopping(monitor='loss',  #'val_loss
@@ -77,20 +85,22 @@ if __name__ == "__main__":
 
     history = model.fit(
         X_train,
-        y_train,
+        X_train,
         batch_size=config["batch"],
         shuffle=True,
         epochs=epochs,
         verbose=1,
-        validation_data=(X_test, y_test),
+        validation_data=(X_test, X_test),
         callbacks=callbacks_list)
+
+    model.save('encoder.h5')
 
     history_dict = history.history
     # print(f'keys:{history_dict.keys()}')
 
-    error = np.array(history.history['rmsle'])
+    error = np.array(history.history['mae'])
     loss = np.array(history.history['loss'])
-    val_error = np.array(history.history['val_rmsle'])
+    val_error = np.array(history.history['val_mae'])
     val_loss = np.array(history.history['val_loss'])
 
     start_iter = 20
