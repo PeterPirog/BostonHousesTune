@@ -14,6 +14,7 @@ from Transformers import QuantileTransformerDf, IterativeImputerDf, RareLabelNan
 import pandas as pd
 
 
+
 def make_xgb_preprocessing(config):
     train_enc_file = f'X_train_enc_rare_tol_{config["rare_tol"]}_n_categories_{config["n_categories"]}_max_iter_{config["max_iter"]}_iter_tol_{config["iter_tol"]}_no_pca.npy'
     train_enc_path = '/home/peterpirog/PycharmProjects/BostonHousesTune/data/encoded/' + train_enc_file
@@ -134,16 +135,22 @@ if __name__ == "__main__":
     # define model evaluation method
     cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
     # evaluate_model
+    """
     scores = cross_val_score(model, X, y,
                              scoring=make_scorer(rmsle),  # 'neg_mean_absolute_error'
                              cv=cv,
                              n_jobs=-1)
+    """
+
+    model.fit(X,y)
     # force scores to be positive
-    scores = abs(scores)
-    print('Mean RMSLE: %.3f (%.3f)' % (scores.mean(), scores.std()))
+    #scores = abs(scores)
+    #print('Mean RMSLE: %.3f (%.3f)' % (scores.mean(), scores.std()))
 
     # saving to file with proper feature names
-    xgbfir.saveXgbFI(model, feature_names=X.feature_names, OutputXlsxFile='X_fi.xlsx')
+    xgbfir.saveXgbFI(model, feature_names=X.columns, OutputXlsxFile='X_fi.xlsx')
+
+
     """
     model.save('encoder.h5')
 

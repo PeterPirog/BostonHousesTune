@@ -490,7 +490,7 @@ def make_preprocessing(config):
                                  initial_strategy='median',
                                  max_iter=config['max_iter'],
                                  tol=config['iter_tol'],
-                                 verbose=0, dataframe_as_output=False)
+                                 verbose=3, dataframe_as_output=False)
         # Step 5 PCA
         pca = PCA(n_components=config['n_components'], svd_solver='full')
 
