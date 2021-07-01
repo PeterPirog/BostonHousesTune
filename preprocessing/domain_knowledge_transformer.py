@@ -130,7 +130,7 @@ class DomainKnowledgeTransformer(BaseEstimator, TransformerMixin):
         ### "YearBuilt YearRemodAdd" - default value np.nan
         X_['_YearBuilt'] = np.where(df['YearBuilt'].isnull(), np.nan, df['YearBuilt'].values)
         X_['_YearRemodAdd'] = np.where(df['YearRemodAdd'].isnull(), np.nan, df['YearRemodAdd'].values)
-        X_['_BuildingAge']=df['YrSold']-df['YearBuilt']
+        X_['_BuildingAge'] = df['YrSold'] - df['YearBuilt']
         X_['_YearsFromRemod'] = df['YrSold'] - df['YearRemodAdd']
         if self.remove_original:
             X_ = X_.drop(['YearBuilt'], axis=1)
@@ -172,8 +172,6 @@ class DomainKnowledgeTransformer(BaseEstimator, TransformerMixin):
         X_['_MasVnrType_BrkFace'] = np.where(df['MasVnrType'] == 'BrkFace', 1, 0)
         X_['_MasVnrType_CBlock'] = np.where(df['MasVnrType'] == 'CBlock', 1, 0)
         X_['_MasVnrType_Stone'] = np.where(df['MasVnrType'] == 'Stone', 1, 0)
-
-
         if self.remove_original:
             X_ = X_.drop(['MasVnrType'], axis=1)
 
@@ -182,16 +180,40 @@ class DomainKnowledgeTransformer(BaseEstimator, TransformerMixin):
         if self.remove_original:
             X_ = X_.drop(['MasVnrArea'], axis=1)
 
+        ### "ExterQual" - default value np.nan
+        X_['_ExterQual'] = np.nan
+        X_['_ExterQual'] = np.where(df['ExterQual'] == 'Ex', 4, X_['_ExterQual'].values)
+        X_['_ExterQual'] = np.where(df['ExterQual'] == 'Gd', 3, X_['_ExterQual'].values)
+        X_['_ExterQual'] = np.where(df['ExterQual'] == 'TA', 2, X_['_ExterQual'].values)
+        X_['_ExterQual'] = np.where(df['ExterQual'] == 'Fa', 1, X_['_ExterQual'].values)
+        X_['_ExterQual'] = np.where(df['ExterQual'] == 'Po', 0, X_['_ExterQual'].values)
+        if self.remove_original:
+            X_ = X_.drop(['ExterQual'], axis=1)
 
+        ### "ExterCond" - default value np.nan
+        X_['_ExterCond'] = np.nan
+        X_['_ExterCond'] = np.where(df['ExterCond'] == 'Ex', 4, X_['_ExterCond'].values)
+        X_['_ExterCond'] = np.where(df['ExterCond'] == 'Gd', 3, X_['_ExterCond'].values)
+        X_['_ExterCond'] = np.where(df['ExterCond'] == 'TA', 2, X_['_ExterCond'].values)
+        X_['_ExterCond'] = np.where(df['ExterCond'] == 'Fa', 1, X_['_ExterCond'].values)
+        X_['_ExterCond'] = np.where(df['ExterCond'] == 'Po', 0, X_['_ExterCond'].values)
+        if self.remove_original:
+            X_ = X_.drop(['ExterCond'], axis=1)
 
+        ### "Foundation" - default value np.nan
+        X_['_Foundation'] = np.where(df['Foundation'].isnull(), np.nan, df['Foundation'].values)
+        if self.remove_original:
+            X_ = X_.drop(['Foundation'], axis=1)
 
-
-
-
-
-
-
-
+        ### "BsmtQual" - default value 0
+        X_['_BsmtQual'] = 0
+        X_['_BsmtQual'] = np.where(df['BsmtQual'] == 'Ex', 5, X_['_BsmtQual'].values)
+        X_['_BsmtQual'] = np.where(df['BsmtQual'] == 'Gd', 4, X_['_BsmtQual'].values)
+        X_['_BsmtQual'] = np.where(df['BsmtQual'] == 'TA', 3, X_['_BsmtQual'].values)
+        X_['_BsmtQual'] = np.where(df['BsmtQual'] == 'Fa', 2, X_['_BsmtQual'].values)
+        X_['_BsmtQual'] = np.where(df['BsmtQual'] == 'Po', 1, X_['_BsmtQual'].values)
+        if self.remove_original:
+            X_ = X_.drop(['BsmtQual'], axis=1)
 
 
         return X_
