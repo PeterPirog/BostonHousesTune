@@ -18,7 +18,7 @@ class DomainKnowledgeTransformer(BaseEstimator, TransformerMixin):
         X_ = X_.drop(['Id'], axis=1)
 
         ### "MSSubClass" - feature (it's only index -remove)
-        X_['_MSSubClass'] = X_['MSSubClass'].astype(dtype='category')
+        X_['_MSSubClass'] = X_.MSSubClass.map(str)+'_'  #convert to string from integer
         ####df['_MSSubClass'] = df['MSSubClass'].apply(lambda x: 'True' if x <= 53 else 'False')
         if self.remove_original:
             X_ = X_.drop(['MSSubClass'], axis=1)
@@ -406,6 +406,8 @@ class DomainKnowledgeTransformer(BaseEstimator, TransformerMixin):
         X_['_GarageType_BuiltIn'] = np.where(df['GarageType'] == 'BuiltIn', 1, 0)
         X_['_GarageType_CarPort'] = np.where(df['GarageType'] == 'CarPort', 1, 0)
         X_['_GarageType_Detchd'] = np.where(df['GarageType'] == 'Detchd', 1, 0)
+        if self.remove_original:
+            X_ = X_.drop(['GarageType'], axis=1)
 
         ### "GarageYrBlt" - default value np.nan
         X_['_GarageYrBlt'] = np.where(df['GarageYrBlt'].isnull(), np.nan, df['GarageYrBlt'].values)
@@ -587,8 +589,11 @@ if __name__ == '__main__':
     register_ray()
     with joblib.parallel_backend('ray'):
         df_out = dkt.fit_transform(X=df)
-
-        df_out.to_excel('/home/peterpirog/PycharmProjects/BostonHousesTune/preprocessing/output_data.xlsx',
+        df_out.to_csv(path_or_buf='/home/peterpirog/PycharmProjects/BostonHousesTune/preprocessing/preprocessed_train_data.csv',
+                      sep=',',
+                      header=True,
+                      index=False)
+        df_out.to_excel('/home/peterpirog/PycharmProjects/BostonHousesTune/preprocessing/preprocessed_train_data.xlsx',
                         sheet_name='output_data',
                         index=False)
 

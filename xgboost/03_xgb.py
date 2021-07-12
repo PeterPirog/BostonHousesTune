@@ -1,4 +1,4 @@
-﻿import numpy as np
+import numpy as np
 from numpy import load, save
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
@@ -16,26 +16,27 @@ import pandas as pd
 
 
 def make_xgb_preprocessing(config):
-    train_enc_file = f'X_train_enc_rare_tol_{config["rare_tol"]}_n_categories_{config["n_categories"]}_max_iter_{config["max_iter"]}_iter_tol_{config["iter_tol"]}_no_pca.npy'
-    train_enc_path = '/home/peterpirog/PycharmProjects/BostonHousesTune/data/encoded/' + train_enc_file
-    y_train_path = '/home/peterpirog/PycharmProjects/BostonHousesTune/data/encoded/y_train.npy'
+    train_enc_file = f'train_encoded_rare_tol_{config["rare_tol"]}_n_categories_{config["n_categories"]}_max_iter_' \
+                     f'{config["max_iter"]}_iter_tol_{config["iter_tol"]}.csv'
+    train_enc_path = '/home/peterpirog/PycharmProjects/BostonHousesTune/data/preprocessing/' + train_enc_file
+    #y_train_path = '/home/peterpirog/PycharmProjects/BostonHousesTune/data/encoded/y_train.npy'
 
-    pipeline_file = f'pipeline_{config["rare_tol"]}_n_categories_{config["n_categories"]}_max_iter_{config["max_iter"]}_iter_tol_{config["iter_tol"]}_no_pca.pkl'
-    pipeline_path = '/home/peterpirog/PycharmProjects/BostonHousesTune/data/' + pipeline_file
-
+    #pipeline_file = f'pipeline_{config["rare_tol"]}_n_categories_{config["n_categories"]}_max_iter_{config["max_iter"]}_iter_tol_{config["iter_tol"]}_no_pca.pkl'
+    #pipeline_path = '/home/peterpirog/PycharmProjects/BostonHousesTune/data/' + pipeline_file
+#
     try:
-        joblib.load(pipeline_path, mmap_mode=None)
+        #joblib.load(pipeline_path, mmap_mode=None)
         X_train_encoded = load(file=train_enc_path)
-        Y_train = load(file=y_train_path)
+        #Y_train = load(file=y_train_path)
 
     except:
-        df_train = pd.read_csv('/home/peterpirog/PycharmProjects/BostonHousesTune/data/train.csv')
-
+        #df_train = pd.read_csv('/home/peterpirog/PycharmProjects/BostonHousesTune/data/train.csv')
+        df_train = pd.read_csv('/home/peterpirog/PycharmProjects/BostonHousesTune/data/preprocessed_train_data.csv')
 
         # csv preprcessing
-        df_train['MSSubClass'] = df_train['MSSubClass'].astype(dtype='category')  # convert feature to categorical
-        X_train = df_train.drop(['Id', 'SalePrice'], axis=1)
-
+        #df_train['MSSubClass'] = df_train['MSSubClass'].astype(dtype='category')  # convert feature to categorical
+        #X_train = df_train.drop(['Id', 'SalePrice'], axis=1)
+        X_train = df_train.drop(['SalePrice'], axis=1)
         Y_train = df_train['SalePrice'].astype(dtype=np.float32)
 
         # PREPROCESSING
@@ -85,7 +86,7 @@ def make_xgb_preprocessing(config):
         X_train_encoded = pipeline.transform(X_train).astype(dtype=np.float32)
         # save X_train_encoded array
         save(file=train_enc_path, arr=X_train_encoded)
-        save(file=y_train_path, arr=Y_train)
+        #save(file=y_train_path, arr=Y_train)
 
         # save trained pipeline
         joblib.dump(pipeline, pipeline_path)
@@ -95,6 +96,7 @@ def make_xgb_preprocessing(config):
                                                         shuffle=True,
                                                         test_size=0.2,
                                                         random_state=42)
+
     return X_train, X_test, y_train, y_test
 
 
@@ -114,9 +116,9 @@ if __name__ == "__main__":
         # PREPROCESSING
         # Rare label encoder
         "rare_tol": 0.05,
-        "n_categories": 2,
+        "n_categories": 1,
         # Iterative imputer
-        "max_iter": 30,
+        "max_iter": 10,
         "iter_tol": 0.001,
         "output": 'df'
     }
@@ -137,17 +139,17 @@ if __name__ == "__main__":
     # define model evaluation method
     cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
     # evaluate_model
-    """
+
     scores = cross_val_score(model, X, y,
                              scoring=make_scorer(rmsle),  # 'neg_mean_absolute_error'
                              cv=cv,
                              n_jobs=-1)
-    """
 
-    model.fit(X,y)
+
+    #model.fit(X,y)
     # force scores to be positive
-    #scores = abs(scores)
-    #print('Mean RMSLE: %.3f (%.3f)' % (scores.mean(), scores.std()))
+    scores = abs(scores)
+    print('Mean RMSLE: %.3f (%.3f)' % (scores.mean(), scores.std()))
 
     # saving to file with proper feature names
     xgbfir.saveXgbFI(model, feature_names=X.columns, OutputXlsxFile='X_fi.xlsx')
