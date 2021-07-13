@@ -105,7 +105,8 @@ def make_xgb_preprocessing(config):
                                                         test_size=0.2,
                                                         random_state=42)
 
-    return X_train, X_test, y_train, y_test
+    return X_train_encoded,Y_train
+    #return X_train, X_test, y_train, y_test
 
 
 def rmsle(y_true, y_pred, **kwargs):
@@ -127,18 +128,19 @@ if __name__ == "__main__":
         "n_categories": 1,
         # Iterative imputer
         "max_iter": 30,
-        "iter_tol": 0.001,
+        "iter_tol": 0.01,
         "output": 'df'
     }
 
-    X_train, X_test, y_train, y_test = make_xgb_preprocessing(config=config)
-    """
-    X = pd.concat([X_train, X_test], axis=0)
-    y = pd.concat([y_train, y_test], axis=0)
+    #X_train, X_test, y_train, y_test = make_xgb_preprocessing(config=config)
+    X,y = make_xgb_preprocessing(config=config)
+
+    #X = pd.concat([X_train, X_test], axis=0)
+    #y = pd.concat([y_train, y_test], axis=0)
 
     print(f'The input shape is:{X.shape}')
     print(X.head())
-
+    """
     # define model
     model = XGBRegressor(n_estimators=200,
                          max_depth=7,
