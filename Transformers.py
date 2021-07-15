@@ -12,6 +12,8 @@ from sklearn.impute import IterativeImputer
 
 from category_encoders import one_hot
 
+
+
 class QuantileTransformerDf(QuantileTransformer):
     """DataFrame Wrapper around QuantileTransformer
     Function based on: https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.QuantileTransformer.html
@@ -180,13 +182,25 @@ class IterativeImputerDf(IterativeImputer):
                                                  initial_strategy=initial_strategy,
                                                  verbose=verbose)
         self.dataframe_as_output = dataframe_as_output
+        print('dataframe_as_output=', self.dataframe_as_output)
 
     def transform(self, X, y=None):
         X = X.copy()
         z = super(IterativeImputerDf, self).transform(X.values)
 
         if self.dataframe_as_output:
-            return pd.DataFrame(z, index=X.index, columns=X.columns)
+            return pd.DataFrame(z, index=self.index, columns=self.columns)
+        else:
+            return z
+
+    def fit_transform(self, X, y=None):
+        X = X.copy()
+        z = super(IterativeImputerDf, self).fit_transform(X.values)
+        self.index = X.index
+        self.columns = X.columns
+
+        if self.dataframe_as_output:
+            return pd.DataFrame(z, index=self.index, columns=self.columns)
         else:
             return z
 

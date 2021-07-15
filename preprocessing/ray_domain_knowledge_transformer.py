@@ -2,6 +2,7 @@ import ray
 import numpy as np
 import pandas as pd  # modin.pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
+import ray
 
 
 class DomainKnowledgeTransformer(BaseEstimator, TransformerMixin):
@@ -586,16 +587,17 @@ if __name__ == '__main__':
     import joblib
     from ray.util.joblib import register_ray
 
+    register_ray()
+    with joblib.parallel_backend('ray'):
+        df_out = dkt.fit_transform(X=df)
+        df_out.to_csv(path_or_buf='/home/peterpirog/PycharmProjects/BostonHousesTune/preprocessing/preprocessed_train_data.csv',
+                      sep=',',
+                      header=True,
+                      index=False)
+        df_out.to_excel('/home/peterpirog/PycharmProjects/BostonHousesTune/preprocessing/preprocessed_train_data.xlsx',
+                        sheet_name='output_data',
+                        index=False)
 
-    df_out = dkt.fit_transform(X=df)
-    df_out.to_csv(path_or_buf='/home/peterpirog/PycharmProjects/BostonHousesTune/preprocessing/preprocessed_train_data.csv',
-                  sep=',',
-                  header=True,
-                  index=False)
-    df_out.to_excel('/home/peterpirog/PycharmProjects/BostonHousesTune/preprocessing/preprocessed_train_data.xlsx',
-                    sheet_name='output_data',
-                    index=False)
-
-    print(df_out.head(10))
-    print(df_out.info())
-    print(df_out.describe())
+        print(df_out.head(10))
+        print(df_out.info())
+        print(df_out.describe())
