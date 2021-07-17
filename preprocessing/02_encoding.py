@@ -9,6 +9,7 @@ import xgbfir
 
 import joblib
 from category_encoders import OneHotEncoder
+from feature_engine.selection import DropConstantFeatures, DropDuplicateFeatures,SmartCorrelatedSelection
 from Transformers import QuantileTransformerDf, IterativeImputerDf, RareLabelNanEncoder
 
 import pandas as pd
@@ -62,6 +63,12 @@ def make_xgb_preprocessing(config):
                                         subsample=1e5, random_state=42, copy=True, dataframe_as_output=True,
                                         dtype=np.float32)
 
+        dcf=DropConstantFeatures(tol=0.95,
+                                 missing_values='ignore')
+        ddf=DropDuplicateFeatures()
+
+
+
         # STEP 4 - missing values multivariate imputation
         imp = IterativeImputerDf(min_value=0,  # values from 0 to 1 for categorical for numeric
                                  max_value=1,
@@ -70,13 +77,25 @@ def make_xgb_preprocessing(config):
                                  max_iter=config['max_iter'],
                                  tol=config['iter_tol'],
                                  verbose=3, dataframe_as_output=True)
+        scs = SmartCorrelatedSelection(
+            variables=None,
+            method="pearson",
+            threshold=0.9,
+            missing_values="ignore",
+            selection_method="variance",
+            estimator=None,
+        )
+
 
         # STEP 5 MAKE PIPELINE AND TRAIN IT
         pipeline = Pipeline([
             ('rare_lab', rle),
             ('one_hot', ohe),
             ('q_trans', q_trans),
-            ('imputer', imp)
+            ('imputer', imp),
+            ('drop_quasi_const', dcf),
+            ('drop_duplicate', ddf),
+            ('smart_correlated_sel', scs),
         ])
 
         # Pipeline training
@@ -128,7 +147,7 @@ if __name__ == "__main__":
         "n_categories": 1,
         # Iterative imputer
         "max_iter": 30,
-        "iter_tol": 0.01,
+        "iter_tol": 0.001,
         "output": 'df'
     }
 
@@ -140,6 +159,6 @@ if __name__ == "__main__":
 
         X,y = make_xgb_preprocessing(config=config)
 
-        print(f'The input shape is:{X.shape}')
         print(X.head())
+        print(f'The input shape is:{X.shape}')
 
