@@ -38,32 +38,41 @@ if __name__ == "__main__":
     y=df['SalePrice']
     print(f'The y shape is:{y.shape}')
 
-
-
+    n_estimators=200
+    max_depth=1
+    eta=0.1
+    subsample=0.1
+    print(f'Training for n_estimators={n_estimators}, max_depth={max_depth}')
 
     # define model
-    model = XGBRegressor(n_estimators=100,
-                         max_depth=4,
-                         eta=0.1,
-                         subsample=0.1,
+    #https: // towardsdatascience.com / selecting - optimal - parameters -for -xgboost - model - training - c7cd9ed5e45e
+    model = XGBRegressor(n_estimators=n_estimators,
+                         max_depth=max_depth,
+                         eta=eta,
+                         subsample=subsample,
                          colsample_bytree=0.1)
     # define model evaluation method
     cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
     # evaluate_model
 
+    fit_params = {'early_stopping_rounds': 30}
     scores = cross_val_score(model, X, y,
                              scoring=make_scorer(rmsle),  # 'neg_mean_absolute_error'
                              cv=cv,
-                             n_jobs=-1)
+                             n_jobs=-1,
+                             fit_params=fit_params)
 
 
-    model.fit(X,y)
+
     # force scores to be positive
     scores = abs(scores)
-    print('Mean RMSLE: %.3f (%.3f)' % (scores.mean(), scores.std()))
+    print(f'Number of samples:{len(scores)}')
+
+    print('Mean RMSLE: %.4f (%.4f)' % (scores.mean(), scores.std()))
 
     # saving to file with proper feature names
-    xgbfir.saveXgbFI(model, feature_names=X.columns, OutputXlsxFile='feature_analysis.xlsx')
+    # model.fit(X,y)
+    #xgbfir.saveXgbFI(model, feature_names=X.columns, OutputXlsxFile='feature_analysis.xlsx')
 
     """
     model.save('encoder.h5')
