@@ -157,6 +157,6 @@ if __name__ == '__main__':
     model=tf.keras.models.load_model(filepath='my_model.h5')
 
     make_submission(trained_regressor=regressor,
-                    test_csv_file='data/test.csv',
+                    test_csv_file='../BostonEnsemble/data_files/test.csv',
                     preprocessing_pipe_file='preprocessing_pipe.pkl',
                     submission_file_name='data/submission.csv')

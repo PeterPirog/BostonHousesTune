@@ -55,6 +55,7 @@ if __name__ == "__main__":
     import ray
     from ray import tune
     from ray.tune.schedulers import ASHAScheduler
+    from ray.tune.suggest.hyperopt import HyperOptSearch
 
     try:
         ray.init()
@@ -72,6 +73,7 @@ if __name__ == "__main__":
 
     analysis = tune.run(
         train_boston,
+        search_alg=HyperOptSearch(),
         name="xgboost",
         #scheduler=sched_asha, - no need scheduler if there is no iterations
         # Checkpoint settings
@@ -104,3 +106,4 @@ if __name__ == "__main__":
     )
     print("Best hyperparameters found were: ", analysis.best_config)
     # tensorboard --logdir /home/peterpirog/PycharmProjects/BostonHousesTune/xgboost/ray_results/xgboost --bind_all
+    #https://towardsdatascience.com/beyond-grid-search-hypercharge-hyperparameter-tuning-for-xgboost-7c78f7a2929d
